@@ -394,8 +394,20 @@ recursively wherever it's used, however deep.
 
 ## Usage
 
-In your root `MODULE.bazel`, once this module is registered in the [Bazel
-Central Registry](https://registry.bazel.build/):
+This module doesn't need a [Bazel Central Registry](https://registry.bazel.build/)
+release to be consumable as a plain `bazel_dep` - the
+[bazel-rules](https://github.com/VJftw/bazel-rules) repo this lives in
+self-hosts a real module registry at `registry/`, updated on every release
+(see its own README's "Consuming a module from here directly"). Add to your
+`.bazelrc`:
+
+```
+common --registry=https://raw.githubusercontent.com/VJftw/bazel-rules/main/registry/
+common --registry=https://bcr.bazel.build
+```
+
+Then, in your root `MODULE.bazel` (works the same whether resolved from that
+registry or, later, from BCR directly):
 
 ```starlark
 bazel_dep(name = "rules_terraform", version = "0.1.0")

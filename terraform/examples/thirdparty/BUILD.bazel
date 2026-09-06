@@ -1,0 +1,17 @@
+load("@rules_terraform//:defs.bzl", "terraform_root")
+load("@rules_terraform//:testing.bzl", "terraform_root_test")
+
+terraform_root(
+    name = "thirdparty",
+    srcs = ["main.tf"],
+    registry_modules = {
+        "label": "@terraform//:module_label",
+    },
+    version = "1.6.0",
+)
+
+terraform_root_test(
+    name = "thirdparty_plan_test",
+    size = "small",
+    root = ":thirdparty",
+)

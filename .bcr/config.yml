@@ -1,0 +1,6 @@
+# Which top-level directories are independent BCR modules. Each entry needs
+# a matching `.bcr/<entry>/` directory with metadata.template.json,
+# source.template.json, and presubmit.yml.
+# See https://github.com/bazel-contrib/publish-to-bcr
+moduleRoots:
+  - terraform

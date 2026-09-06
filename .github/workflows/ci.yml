@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [terraform]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bazel test //... (module)
+        working-directory: ${{ matrix.module }}
+        run: bazel test //...
+
+      - name: bazel test //... (module examples)
+        if: hashFiles(format('{0}/examples/MODULE.bazel', matrix.module)) != ''
+        working-directory: ${{ matrix.module }}/examples
+        run: bazel test //...

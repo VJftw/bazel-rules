@@ -1,0 +1,38 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
+# Referenced as hidden-attr defaults (e.g. `_stage_module_py`) by rules in
+# private/module.bzl, private/root.bzl, and testing.bzl.
+exports_files([
+    "private/stage_module.py",
+    "private/validate_module.py",
+    "private/terraform_runner_template.py",
+    "private/terraform_root_test_template.py",
+    "private/default_terraform_script.py",
+])
+
+# The toolchain type that `terraform_toolchain` instances register against, and
+# that `terraform_module` requests via its `toolchains` attribute.
+# See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+# The toolchain type that the single `terraform_provider_mirror_toolchain`
+# instance registers against, and that `terraform_module`/`terraform_root`
+# request via `toolchains` to get an offline filesystem mirror of every
+# provider requested via the `terraform` module extension's `.provider()` tag.
+toolchain_type(
+    name = "provider_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+# Selects which registered Terraform toolchain a `terraform_module` target
+# resolves to. `terraform_module` sets this via an outgoing transition based on
+# its own `version` attribute, so different targets in the same build can each
+# get their own Terraform version.
+string_flag(
+    name = "version",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)

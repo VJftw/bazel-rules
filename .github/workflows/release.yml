@@ -1,0 +1,48 @@
+name: Release
+
+# Tag format: <module>-vX.Y.Z, e.g. terraform-v0.1.0 - the version must match
+# that module's own MODULE.bazel `module(version = ...)`. One tag releases
+# one module, independent of the others in this monorepo.
+on:
+  push:
+    tags:
+      - "*-v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine module and build release archive
+        id: package
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          MODULE="${TAG%-v*}"
+
+          if [ ! -d "$MODULE" ] || [ ! -f "$MODULE/MODULE.bazel" ]; then
+            echo "::error::'$MODULE' (parsed from tag '$TAG') is not a module directory" >&2
+            exit 1
+          fi
+
+          ARCHIVE="rules_${MODULE}-${TAG}.tar.gz"
+          # Root of the tarball is the module's own contents (no
+          # module-name/version wrapper directory), matching
+          # .bcr/<module>/source.template.json's empty strip_prefix.
+          tar czf "$ARCHIVE" -C "$MODULE" .
+
+          {
+            echo "archive=$ARCHIVE"
+            echo "module=$MODULE"
+            echo "tag=$TAG"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ steps.package.outputs.module }} ${{ steps.package.outputs.tag }}"
+          files: ${{ steps.package.outputs.archive }}
+          generate_release_notes: true

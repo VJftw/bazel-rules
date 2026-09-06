@@ -1,0 +1,16 @@
+load("@rules_terraform//:defs.bzl", "terraform_root")
+load("@rules_terraform//:testing.bzl", "terraform_root_test")
+
+terraform_root(
+    name = "legacy",
+    srcs = ["main.tf"],
+    dep_sources = {"network": "../network"},
+    version = "1.4.0",
+    deps = {"network": "//network"},
+)
+
+terraform_root_test(
+    name = "legacy_plan_test",
+    size = "small",
+    root = ":legacy",
+)

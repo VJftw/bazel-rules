@@ -1,0 +1,14 @@
+# Referenced as hidden-attr defaults by rules in private/opa_eval.bzl and
+# private/opa_test.bzl.
+exports_files([
+    "private/capture_stdout.nu",
+    "private/opa_test_runner_template.nu",
+])
+
+# The toolchain type that `opa_toolchain` instances register against, and
+# that `opa_build`/`opa_eval`/`opa_test` request via their own `toolchains`
+# attribute. See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)

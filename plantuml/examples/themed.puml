@@ -1,0 +1,4 @@
+@startuml
+!include theme.iuml
+Alice -> Bob: Themed hello
+@enduml

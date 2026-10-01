@@ -1,0 +1,19 @@
+# Sanity-checks a released rules_nushell version by building/testing its own
+# examples/ module (a separate bzlmod module that consumes rules_nushell the
+# same way any real user would).
+#
+# windows is deliberately left out of the matrix for now - the module's own
+# README flags Windows support as implemented-but-unverified (no Windows
+# machine to test against). Add it here once that's actually confirmed.
+bcr_test_module:
+  module_path: "examples"
+  matrix:
+    platform: ["debian11", "macos"]
+    bazel: ["7.x", "8.x"]
+  tasks:
+    run_tests:
+      name: "Run test module"
+      platform: ${{ platform }}
+      bazel: ${{ bazel }}
+      test_targets:
+        - "//..."

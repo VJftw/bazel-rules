@@ -3,8 +3,8 @@
 load(
     "//:private/common.bzl",
     "COMMON_ATTRS",
+    "NU_TOOLCHAIN_TYPE",
     "PROVIDER_TOOLCHAIN_TYPE",
-    "PY_TOOLCHAIN_TYPE",
     "TOOLCHAIN_TYPE",
     "TerraformModuleInfo",
     "VERSION_TRANSITION",
@@ -54,5 +54,5 @@ terraform_module = rule(
     module's `version` to differ from a dependent `terraform_root`'s.
     """,
     attrs = COMMON_ATTRS,
-    toolchains = [TOOLCHAIN_TYPE, PROVIDER_TOOLCHAIN_TYPE, PY_TOOLCHAIN_TYPE],
+    toolchains = [TOOLCHAIN_TYPE, PROVIDER_TOOLCHAIN_TYPE, NU_TOOLCHAIN_TYPE],
 )

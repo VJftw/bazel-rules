@@ -1,12 +1,23 @@
 name: Release
 
-# Tag format: <module>-vX.Y.Z, e.g. terraform-v0.1.0 - the version must match
-# that module's own MODULE.bazel `module(version = ...)`. One tag releases
-# one module, independent of the others in this monorepo.
+# Publishes every module version that has a registry/ entry but no GitHub
+# Release yet - i.e. whatever a just-merged pull request added (see
+# .github/scripts/registry.py). Each is released as its own `<module>-vX.Y.Z`
+# tag, created here (pointing at the merged commit), with the module's
+# release archive attached.
+#
+# Never pushes to main - the registry entry already arrived through the pull
+# request, so this works with branch protection on main.
 on:
   push:
-    tags:
-      - "*-v*"
+    branches: [main]
+  # To retry a release that failed part-way, e.g. a transient network error.
+  workflow_dispatch:
+
+# One at a time, so two quick merges can't race to release the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -15,67 +26,29 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Full history (not just the tag) so the registry/ commit below
-          # can be rebased onto main - a shallow checkout has no common
-          # ancestor with origin/main to rebase from.
-          fetch-depth: 0
 
-      - name: Determine module and build release archive
-        id: package
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF#refs/tags/}"
-          MODULE="${TAG%-v*}"
-
-          if [ ! -d "$MODULE" ] || [ ! -f "$MODULE/MODULE.bazel" ]; then
-            echo "::error::'$MODULE' (parsed from tag '$TAG') is not a module directory" >&2
-            exit 1
-          fi
-
-          ARCHIVE="rules_${MODULE}-${TAG}.tar.gz"
-          # Root of the tarball is the module's own contents (no
-          # module-name/version wrapper directory), matching
-          # .bcr/<module>/source.template.json's empty strip_prefix.
-          tar czf "$ARCHIVE" -C "$MODULE" .
-
-          {
-            echo "archive=$ARCHIVE"
-            echo "module=$MODULE"
-            echo "tag=$TAG"
-          } >>"$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "${{ steps.package.outputs.module }} ${{ steps.package.outputs.tag }}"
-          files: ${{ steps.package.outputs.archive }}
-          generate_release_notes: true
-
-      - name: Update registry/ for this version
+      - name: Release new module versions
         env:
-          MODULE: ${{ steps.package.outputs.module }}
-          TAG: ${{ steps.package.outputs.tag }}
-          ARCHIVE: ${{ steps.package.outputs.archive }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 .github/scripts/update_registry.py \
-            --registry-dir registry \
-            --module-root "$MODULE" \
-            --archive "$ARCHIVE" \
-            --url "https://github.com/${{ github.repository }}/releases/download/${TAG}/${ARCHIVE}" \
-            --metadata-template ".bcr/${MODULE}/metadata.template.json"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add registry/
-          git commit -m "registry: add ${MODULE} ${TAG#${MODULE}-}"
+          python3 .github/scripts/registry.py releasable | while read -r module tag; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "${module}: ${tag} is already released"
+              continue
+            fi
 
-          # main may have moved since checkout; rebase our one commit onto it
-          # and retry a few times in case of a concurrent registry update.
-          for i in 1 2 3 4 5; do
-            git fetch origin main
-            git rebase origin/main && git push origin HEAD:main && break
-            git rebase --abort
-            sleep $((i * 5))
+            # The registry entry was written (in the pull request) from a
+            # reproducible build of this same archive - --verify refuses to
+            # publish anything that doesn't match what consumers will check
+            # it against.
+            archive="rules_${module}-${tag}.tar"
+            python3 .github/scripts/registry.py archive "$module" --out "$archive" --verify
+
+            echo "${module}: releasing ${tag}"
+            gh release create "$tag" "$archive" \
+              --target "$GITHUB_SHA" \
+              --title "${module} ${tag}" \
+              --generate-notes
           done

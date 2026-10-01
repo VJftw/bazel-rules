@@ -8,39 +8,31 @@ ever needed the network, `terraform plan` would fail to reach it and the
 test would fail.
 """
 
-load(
-    "//:private/common.bzl",
-    "PY_TOOLCHAIN_TYPE",
-    "py_interpreter",
-    "py_runtime_files",
-    "rlocation_path",
-    "windows_launcher",
-)
+load("@rules_nushell//:nu.bzl", "NU_LAUNCHER_ATTRS", "NU_TOOLCHAIN_TYPE", "nu_launcher", "rlocation_path")
 
-_TEST_TEMPLATE = Label("//:private/terraform_root_test_template.py")
+_TEST_TEMPLATE = Label("//:private/terraform_root_test_template.nu")
 
 def _terraform_root_test_impl(ctx):
     root_info = ctx.attr.root[DefaultInfo]
     runner = root_info.files_to_run.executable
 
-    py_script = ctx.actions.declare_file(ctx.label.name + ".py")
+    script = ctx.actions.declare_file(ctx.label.name + "_runner.nu")
     ctx.actions.expand_template(
         template = ctx.file._test_template,
-        output = py_script,
-        is_executable = True,
+        output = script,
         substitutions = {
             "%{runner_rlocation}%": rlocation_path(ctx, runner),
             "%{tf_args_json}%": json.encode(ctx.attr.tf_args),
         },
     )
 
-    interpreter = py_interpreter(ctx)
-    executable = windows_launcher(ctx, py_script, interpreter)
+    launcher = nu_launcher(ctx, script)
+    executable = launcher.executable
 
-    runfiles = ctx.runfiles(files = [runner, py_script, interpreter])
+    runfiles = ctx.runfiles(files = [runner])
     runfiles = runfiles.merge_all([
+        launcher.runfiles,
         root_info.default_runfiles,
-        ctx.runfiles(transitive_files = py_runtime_files(ctx)),
     ])
 
     return [DefaultInfo(executable = executable, runfiles = runfiles)]
@@ -56,7 +48,6 @@ terraform_root_test = rule(
         "root": attr.label(mandatory = True, executable = True, cfg = "target"),
         "tf_args": attr.string_list(default = ["plan", "-input=false", "-no-color"]),
         "_test_template": attr.label(default = _TEST_TEMPLATE, allow_single_file = True),
-        "_windows_constraint": attr.label(default = "@platforms//os:windows"),
-    },
-    toolchains = [PY_TOOLCHAIN_TYPE],
+    } | NU_LAUNCHER_ATTRS,
+    toolchains = [NU_TOOLCHAIN_TYPE],
 )

@@ -2,60 +2,65 @@
 
 A small Bazel module providing hermetic, per-target Terraform toolchains.
 
-- **Toolchains**: Terraform binaries and provider plugins are both wired up
-  through Bazel's [toolchain](https://bazel.build/extending/toolchains)
-  mechanism (`toolchain_type`, `terraform_toolchain`,
-  `terraform_provider_mirror_toolchain`, `toolchain()`), not hardcoded labels,
-  so resolution follows normal Bazel toolchain rules (exec platform matching,
-  registration order, etc).
-- **Single repository, from `MODULE.bazel`'s perspective**: every requested
-  Terraform version and provider plugin is addressable through one external
-  repository, `@terraform` (see `extensions.bzl`) - there's no per-version,
-  per-provider, or per-platform repo to wire up yourself, just one
-  `use_repo(terraform, "terraform")` and one
-  `register_toolchains("@terraform//:all")`. Under the hood `@terraform` is a
-  thin hub of `toolchain()` aliases; the actual archives are fetched lazily,
-  one real repository per platform, only for whichever platform(s) a given
-  build's toolchain resolution actually selects - see Supported platforms
-  below.
-- **Multiple versions, different targets, same build**: both rules take a
-  `version` attribute and apply a
-  [Starlark transition](https://bazel.build/extending/config#user-defined-transitions)
-  that sets the `//:version` build setting for that target's own
-  configuration before toolchain resolution runs. A `legacy` root pinned to
-  `1.4.0` and a `new` root pinned to `1.6.0` (see `examples/`)
-  each resolve to their own toolchain in the same `bazel build`/`bazel run`
-  invocation - no need to pass `--//build/rules/terraform:version` on the
-  command line or run separate builds. Each `terraform_module` pins its own
-  `version` too, independent of any `terraform_root` depending on it - see
-  Rules below.
-- **Hermetic providers**: provider plugins requested via `terraform.provider`
-  tags are fetched once, unpacked into a Terraform
-  [filesystem mirror](https://developer.hashicorp.com/terraform/cli/config/config-file#explicit-installation-method-configuration)
-  layout, and pointed to via a generated `.terraformrc`
-  (`TF_CLI_CONFIG_FILE`) with `direct` installation disabled - so
-  `terraform init` never needs network access, and both the build-time
-  validate action and `bazel run ... -- plan/apply` run fully sandboxed.
-- **Hermetic third-party modules**: registry/git modules requested via
-  `terraform.module` tags are fetched once and pre-declared in a fabricated
-  `.terraform/modules/modules.json`, so `init` skips resolving them over the
-  network too - see Third-party modules below.
-- **In-repo providers**: `terraform_local_provider` adds an in-repo-built
-  provider plugin binary (e.g. a `go_binary`) to the same offline mirror as
-  fetched providers, via a `local_providers` attribute - so a provider you're
-  developing alongside your Terraform config never needs a published release
-  to be usable - see Providers below.
-- **OpenTofu (or any compatible fork)**: `terraform.version`'s `url_template`/
-  `bin_name` let a "version" mean a build from somewhere other than
-  HashiCorp - see Checksum mirror below.
-- **No bash dependency**: every build action (staging, `init`/`validate`)
-  and `terraform_root`'s `bazel run`/`terraform_root_test` runtime wrapper
-  are Python, executed via a hermetic interpreter resolved from
-  `rules_python`'s toolchain (`bazel_dep(name = "rules_python")` +
-  `python.toolchain(...)` in this module's own `MODULE.bazel` - propagates
-  to consumers automatically via normal bzlmod toolchain registration, no
-  extra `MODULE.bazel` wiring needed on your side). See Windows below for
-  what this means for that platform specifically.
+## Quickstart
+
+In your `.bazelrc`:
+
+```
+common --registry=https://raw.githubusercontent.com/VJftw/bazel-rules/main/registry/
+common --registry=https://bcr.bazel.build
+```
+
+In your root `MODULE.bazel`:
+
+```starlark
+bazel_dep(name = "rules_terraform", version = "0.1.0")
+
+terraform = use_extension("@rules_terraform//:extensions.bzl", "terraform")
+terraform.version(version = "1.6.0")  # see Checksum mirror below for why no sha256
+use_repo(terraform, "terraform")
+
+register_toolchains("@terraform//:all")
+```
+
+In a `BUILD.bazel` next to your `.tf` files:
+
+```starlark
+load("@rules_terraform//:defs.bzl", "terraform_root")
+
+terraform_root(
+    name = "root",
+    srcs = ["main.tf"],
+    version = "1.6.0",
+)
+```
+
+```console
+$ bazel build //:root      # runs `terraform init && terraform validate`
+$ bazel run //:root -- plan
+```
+
+See [Usage](#usage) below for providers/modules, the full BCR/`git_override`/
+local dev options, and each feature's own dedicated section for more.
+
+## Contents
+
+- [Rules](#rules)
+- [Usage](#usage)
+- [How it works](#how-it-works)
+- [Custom workflows](#custom-workflows)
+- [Providers](#providers)
+  - [Third-party providers](#third-party-providers)
+  - [In-repo (local) providers](#in-repo-local-providers)
+- [Third-party modules](#third-party-modules)
+  - [Third-party modules referenced through a local `deps` module](#third-party-modules-referenced-through-a-local-deps-module)
+  - [A third-party module that itself depends on further third-party modules](#a-third-party-module-that-itself-depends-on-further-third-party-modules)
+- [Testing](#testing)
+- [Checksum mirror](#checksum-mirror)
+  - [OpenTofu and other forks](#opentofu-and-other-forks)
+- [Supported platforms](#supported-platforms)
+- [Windows](#windows)
+- [Layout](#layout)
 
 ## Rules
 
@@ -82,6 +87,162 @@ raises no error if they differ, since real Terraform modules aren't tied to a
 specific CLI version anyway. Giving `terraform_module` its own `version` is
 mainly so it can be built standalone (`bazel build //path:module`) without
 having to pass `--@rules_terraform//:version=X.Y.Z` on the command line.
+
+## Usage
+
+This module doesn't need a [Bazel Central Registry](https://registry.bazel.build/)
+release to be consumable as a plain `bazel_dep` - the
+[bazel-rules](https://github.com/VJftw/bazel-rules) repo this lives in
+self-hosts a real module registry at `registry/`, updated on every release
+(see its own README's "Consuming a module from here directly"). Add to your
+`.bazelrc`:
+
+```
+common --registry=https://raw.githubusercontent.com/VJftw/bazel-rules/main/registry/
+common --registry=https://bcr.bazel.build
+```
+
+Then, in your root `MODULE.bazel` (works the same whether resolved from that
+registry or, later, from BCR directly):
+
+```starlark
+bazel_dep(name = "rules_terraform", version = "0.1.0")
+
+terraform = use_extension("@rules_terraform//:extensions.bzl", "terraform")
+
+# No `sha256` needed for either - both are 1.x versions already covered by
+# the generated checksum mirror (private/versions.bzl) - see Checksum
+# mirror below.
+terraform.version(version = "1.4.0")
+terraform.version(version = "1.6.0")
+
+terraform.provider(
+    source = "hashicorp/random",
+    version = "3.6.0",
+    sha256 = {...},  # optional, but recommended
+)
+terraform.module(
+    name = "label",
+    source = "registry.terraform.io/cloudposse/label/null",
+    version = "0.25.0",
+    url = "https://github.com/cloudposse/terraform-null-label/archive/<ref>.tar.gz",
+    sha256 = "...",
+    strip_prefix = "terraform-null-label-<ref>",
+)
+use_repo(terraform, "terraform")
+
+register_toolchains("@terraform//:all")
+```
+
+Before this module has a BCR release, or to develop against an unreleased
+change, use a `git_override` (pinned to a commit) or, for a local checkout of
+this repo, a `local_path_override` instead of the `bazel_dep` version above -
+both need the same `strip_prefix`/`path` pointing at this module's own
+`terraform/` subdirectory, since this repo is a monorepo of multiple modules:
+
+```starlark
+bazel_dep(name = "rules_terraform", version = "0.1.0")
+
+# Option A: pin to a commit on the bazel-rules repo.
+git_override(
+    module_name = "rules_terraform",
+    remote = "https://github.com/VJftw/bazel-rules.git",
+    commit = "<commit-sha>",
+    strip_prefix = "terraform",
+)
+
+# Option B: a local checkout of VJftw/bazel-rules, e.g. for developing
+# rules_terraform itself alongside a consumer.
+local_path_override(
+    module_name = "rules_terraform",
+    path = "../bazel-rules/terraform",
+)
+```
+
+In a `BUILD.bazel` next to your `.tf` files:
+
+```starlark
+load("@rules_terraform//:defs.bzl", "terraform_module", "terraform_root")
+
+# A shared module, referenced by root modules below via `source = "../network"`.
+terraform_module(
+    name = "network",
+    srcs = ["main.tf"],
+    version = "1.4.0",
+    visibility = ["//visibility:public"],
+)
+
+terraform_root(
+    name = "legacy",
+    srcs = ["main.tf"],
+    deps = {"network": ":network"},
+    version = "1.4.0",
+)
+```
+
+`bazel build //path:legacy` runs `terraform init && terraform validate`
+against `legacy` and `network` using Terraform 1.4.0, resolving any
+`required_providers` from the offline mirror. `bazel run //path:legacy --
+plan` runs Terraform 1.4.0's `plan` against it, same mirror. A sibling
+`terraform_root` with `version = "1.6.0"` does the same with 1.6.0, in the
+same build/invocation, with no other changes required.
+
+## How it works
+
+- **Toolchains**: Terraform binaries and provider plugins are both wired up
+  through Bazel's [toolchain](https://bazel.build/extending/toolchains)
+  mechanism (`toolchain_type`, `terraform_toolchain`,
+  `terraform_provider_mirror_toolchain`, `toolchain()`), not hardcoded labels,
+  so resolution follows normal Bazel toolchain rules (exec platform matching,
+  registration order, etc).
+- **Single repository, from `MODULE.bazel`'s perspective**: every requested
+  Terraform version and provider plugin is addressable through one external
+  repository, `@terraform` (see `extensions.bzl`) - there's no per-version,
+  per-provider, or per-platform repo to wire up yourself, just one
+  `use_repo(terraform, "terraform")` and one
+  `register_toolchains("@terraform//:all")`. Under the hood `@terraform` is a
+  thin hub of `toolchain()` aliases; the actual archives are fetched lazily,
+  one real repository per platform, only for whichever platform(s) a given
+  build's toolchain resolution actually selects - see Supported platforms
+  below.
+- **Multiple versions, different targets, same build**: both rules take a
+  `version` attribute and apply a
+  [Starlark transition](https://bazel.build/extending/config#user-defined-transitions)
+  that sets the `//:version` build setting for that target's own
+  configuration before toolchain resolution runs. A `legacy` root pinned to
+  `1.4.0` and a `new` root pinned to `1.6.0` (see `examples/`)
+  each resolve to their own toolchain in the same `bazel build`/`bazel run`
+  invocation - no need to pass `--//build/rules/terraform:version` on the
+  command line or run separate builds. Each `terraform_module` pins its own
+  `version` too, independent of any `terraform_root` depending on it - see
+  Rules above.
+- **Hermetic providers**: provider plugins requested via `terraform.provider`
+  tags are fetched once, unpacked into a Terraform
+  [filesystem mirror](https://developer.hashicorp.com/terraform/cli/config/config-file#explicit-installation-method-configuration)
+  layout, and pointed to via a generated `.terraformrc`
+  (`TF_CLI_CONFIG_FILE`) with `direct` installation disabled - so
+  `terraform init` never needs network access, and both the build-time
+  validate action and `bazel run ... -- plan/apply` run fully sandboxed.
+- **Hermetic third-party modules**: registry/git modules requested via
+  `terraform.module` tags are fetched once and pre-declared in a fabricated
+  `.terraform/modules/modules.json`, so `init` skips resolving them over the
+  network too - see Third-party modules below.
+- **In-repo providers**: `terraform_local_provider` adds an in-repo-built
+  provider plugin binary (e.g. a `go_binary`) to the same offline mirror as
+  fetched providers, via a `local_providers` attribute - so a provider you're
+  developing alongside your Terraform config never needs a published release
+  to be usable - see Providers below.
+- **OpenTofu (or any compatible fork)**: `terraform.version`'s `url_template`/
+  `bin_name` let a "version" mean a build from somewhere other than
+  HashiCorp - see Checksum mirror below.
+- **No bash dependency**: every build action (staging, `init`/`validate`)
+  and `terraform_root`'s `bazel run`/`terraform_root_test` runtime wrapper
+  are Nushell scripts, run via a hermetic `nu` resolved from
+  [`rules_nushell`](../nushell/README.md)'s toolchain (`bazel_dep(name =
+  "rules_nushell")` in this module's own `MODULE.bazel` - it registers its
+  own toolchains and default version, propagating to consumers
+  automatically, no extra `MODULE.bazel` wiring needed on your side). See
+  Windows below for what this means for that platform specifically.
 
 ## Custom workflows
 
@@ -137,7 +298,7 @@ Your script receives:
   yourself if you need it.
 
 `target` must resolve to exactly one output file (`DefaultInfo.files`) and be
-executable at runtime - an `sh_binary`/`py_binary`/other executable rule, or a
+executable at runtime - a `nu_binary`/`sh_binary`/other executable rule, or a
 plain source file checked into the repo with its executable bit set
 (`chmod +x` it in the repo; Bazel preserves that bit for a plain file
 dependency).
@@ -179,7 +340,7 @@ $ bazel run //path:legacy -- apply
 ## Providers
 
 Every provider plugin your modules use has to be declared once via
-`terraform.provider` (see Usage below) - there's no fallback to the public
+`terraform.provider` (see Usage above) - there's no fallback to the public
 registry over the network. If a `.tf` file references a provider that wasn't
 declared this way, `terraform init` fails loudly rather than silently
 reaching out to the network.
@@ -296,7 +457,7 @@ module "label" {
 ```
 
 Normally `terraform init` resolves that over the network. To make it
-hermetic, declare it once via `terraform.module` (see Usage below), then wire
+hermetic, declare it once via `terraform.module` (see Usage above), then wire
 it into the consuming `terraform_module`/`terraform_root`'s `registry_modules`
 attribute, keyed by the module call's local name (`"label"` above):
 
@@ -392,105 +553,6 @@ This composes with the `deps`/nested-module-of-a-module cases above - a
 `registry_modules` entry's own vendor-declared `nested` chain is expanded
 recursively wherever it's used, however deep.
 
-## Usage
-
-This module doesn't need a [Bazel Central Registry](https://registry.bazel.build/)
-release to be consumable as a plain `bazel_dep` - the
-[bazel-rules](https://github.com/VJftw/bazel-rules) repo this lives in
-self-hosts a real module registry at `registry/`, updated on every release
-(see its own README's "Consuming a module from here directly"). Add to your
-`.bazelrc`:
-
-```
-common --registry=https://raw.githubusercontent.com/VJftw/bazel-rules/main/registry/
-common --registry=https://bcr.bazel.build
-```
-
-Then, in your root `MODULE.bazel` (works the same whether resolved from that
-registry or, later, from BCR directly):
-
-```starlark
-bazel_dep(name = "rules_terraform", version = "0.1.0")
-
-terraform = use_extension("@rules_terraform//:extensions.bzl", "terraform")
-
-# No `sha256` needed for either - both are 1.x versions already covered by
-# the generated checksum mirror (private/versions.bzl) - see Checksum
-# mirror below.
-terraform.version(version = "1.4.0")
-terraform.version(version = "1.6.0")
-
-terraform.provider(
-    source = "hashicorp/random",
-    version = "3.6.0",
-    sha256 = {...},  # optional, but recommended
-)
-terraform.module(
-    name = "label",
-    source = "registry.terraform.io/cloudposse/label/null",
-    version = "0.25.0",
-    url = "https://github.com/cloudposse/terraform-null-label/archive/<ref>.tar.gz",
-    sha256 = "...",
-    strip_prefix = "terraform-null-label-<ref>",
-)
-use_repo(terraform, "terraform")
-
-register_toolchains("@terraform//:all")
-```
-
-Before this module has a BCR release, or to develop against an unreleased
-change, use a `git_override` (pinned to a commit) or, for a local checkout of
-this repo, a `local_path_override` instead of the `bazel_dep` version above -
-both need the same `strip_prefix`/`path` pointing at this module's own
-`terraform/` subdirectory, since this repo is a monorepo of multiple modules:
-
-```starlark
-bazel_dep(name = "rules_terraform", version = "0.1.0")
-
-# Option A: pin to a commit on the bazel-rules repo.
-git_override(
-    module_name = "rules_terraform",
-    remote = "https://github.com/VJftw/bazel-rules.git",
-    commit = "<commit-sha>",
-    strip_prefix = "terraform",
-)
-
-# Option B: a local checkout of VJftw/bazel-rules, e.g. for developing
-# rules_terraform itself alongside a consumer.
-local_path_override(
-    module_name = "rules_terraform",
-    path = "../bazel-rules/terraform",
-)
-```
-
-In a `BUILD.bazel` next to your `.tf` files:
-
-```starlark
-load("@rules_terraform//:defs.bzl", "terraform_module", "terraform_root")
-
-# A shared module, referenced by root modules below via `source = "../network"`.
-terraform_module(
-    name = "network",
-    srcs = ["main.tf"],
-    version = "1.4.0",
-    visibility = ["//visibility:public"],
-)
-
-terraform_root(
-    name = "legacy",
-    srcs = ["main.tf"],
-    deps = {"network": ":network"},
-    version = "1.4.0",
-)
-```
-
-`bazel build //path:legacy` runs `terraform init && terraform validate`
-against `legacy` and `network` using Terraform 1.4.0, resolving any
-`required_providers` from the offline mirror. `bazel run //path:legacy --
-plan` runs Terraform 1.4.0's `plan` against it, same mirror. A sibling
-`terraform_root` with `version = "1.6.0"` does the same with 1.6.0, in the
-same build/invocation, with no other changes required.
-
 ## Testing
 
 `bazel test //...` sandboxes execution with no network access by default
@@ -550,11 +612,11 @@ Regenerate it with:
 $ cd terraform && bazel run //scripts:mirror_terraform_versions
 ```
 
-(`scripts/mirror_terraform_versions.py`, logic originally adapted from
+(`scripts/mirror_terraform_versions.nu`, logic originally adapted from
 [VJftw/bazel_terraform](https://github.com/VJftw/bazel_terraform/blob/main/scripts/mirror_terraform_releases.sh) -
-runs via the same hermetic Python toolchain as everything else in this
-module rather than bash, though it still shells out to a real `gpg` binary
-on PATH for signature verification). It scrapes releases.hashicorp.com's 1.x
+runs via the same hermetic `nu` as everything else in this module rather
+than bash, though it still shells out to a real `gpg` binary on PATH for
+signature verification). It scrapes releases.hashicorp.com's 1.x
 release list, downloads each
 release's `SHA256SUMS` file, and verifies it against HashiCorp's published
 GPG signature (fetched fresh each run from
@@ -612,32 +674,27 @@ typically just one - not all five.
 ## Windows
 
 Every build action (staging, `init`/`validate`) and `terraform_root`'s
-runtime wrapper are Python scripts, run via a hermetic Python interpreter
-resolved from `rules_python`'s toolchain (see `bazel_dep(name =
-"rules_python")` and the `python.toolchain(...)` call in this module's own
-`MODULE.bazel`) - not bash, and not a Python assumed to already be on PATH.
-This is what makes Windows support here better than "requires Git-Bash/MSYS2
-on PATH": rules_python can fetch a Windows Python build the same way it
-fetches one for Linux/macOS, so there's no extra manual setup expected on a
-Windows machine beyond what any other rules_python-using Bazel module needs.
+runtime wrapper are Nushell scripts, run via a hermetic `nu` resolved from
+[`rules_nushell`](../nushell/README.md)'s toolchain - not bash, and not a
+`nu` (or anything else) assumed to already be on PATH. This is what makes
+Windows support here better than "requires Git-Bash/MSYS2 on PATH":
+`rules_nushell` fetches a Windows `nu.exe` the same way it fetches one for
+Linux/macOS, so there's no extra manual setup expected on a Windows machine.
 
 Two things are handled specially for Windows:
 
 - The fetched Terraform/provider binaries are `.exe`s (`extensions.bzl`
   names the toolchain's `terraform_bin` `terraform.exe` there; the provider
   mirror doesn't care about exact filenames, so no change needed there).
-- `terraform_root`'s `bazel run` executable can't be the `.py` script
-  directly - Windows has no shebang-line support, so Bazel can't launch a
-  text file with `#!/usr/bin/env python3` as a process (this is also why the
-  build actions invoke the resolved interpreter directly as `executable =
-  ...` rather than relying on a shebang at all). `windows_launcher` in
-  `private/common.bzl` instead makes the executable a small `.bat` file that
-  invokes the same resolved Python interpreter (found via its own runfiles
-  path, not assumed to be on PATH) against the same script, setting
-  `RUNFILES_DIR` explicitly first (Bazel names the runfiles directory after
-  whichever file is `DefaultInfo.executable` - now the `.bat`, not the
-  `.py` - so the `.py` script's own runfiles auto-detection would otherwise
-  look in the wrong place).
+- `terraform_root`'s (and `terraform_root_test`'s) `bazel run` executable
+  is a `rules_nushell` launcher (`nu_launcher` in `@rules_nushell//:nu.bzl`)
+  - a tiny `/bin/sh` script elsewhere, but a `.bat` on Windows, which has
+  no shebang-line support. It sets `RUNFILES_DIR` itself (Bazel names the
+  runfiles directory after whichever file is `DefaultInfo.executable` - the
+  `.bat`) and runs the resolved `nu.exe` (found via runfiles, not assumed to
+  be on PATH) against the runner script. The runner then *runs* (rather
+  than `exec`s, which can't replace a process with a `.bat`) whichever
+  script it hands off to, propagating its exit code.
 
 The real, supported scenario is running Bazel *on* Windows directly (`bazel
 build`/`bazel run` from a Windows machine, targeting Windows) - there, the
@@ -651,12 +708,12 @@ generated without error) - it doesn't reflect real usage.
 
 **Caveat**: this hasn't been tested on an actual Windows machine - I don't
 have one available. The mechanism follows Bazel's own documented APIs
-(`ctx.target_platform_has_constraint` for OS detection) and rules_python's
-own toolchain-resolution APIs, and a cross-compiled analysis (`--platforms=<a
-windows platform>`) confirms it generates without error, but real end-to-end
-behavior is unverified. If something's off, `windows_launcher` in
-`private/common.bzl` and the runner template's runfiles-detection logic
-(`private/terraform_runner_template.py`) are the places to look first.
+(`ctx.target_platform_has_constraint` for OS detection) and a
+cross-compiled analysis (`--platforms=<a windows platform>`) confirms it
+generates without error, but real end-to-end behavior is unverified. If
+something's off, `nu_launcher` in `@rules_nushell//:nu.bzl` and the runner
+template (`private/terraform_runner_template.nu`) are the places to look
+first.
 
 ## Layout
 
@@ -666,7 +723,8 @@ behavior is unverified. If something's off, `windows_launcher` in
 - `registry_module.bzl` - `TerraformRegistryModuleInfo`/`terraform_registry_module`
   (a pre-fetched third-party module).
 - `testing.bzl` - `terraform_root_test`, see Testing above.
-- `BUILD.bazel` - the two `toolchain_type`s and the `//:version` `string_flag`.
+- `BUILD.bazel` - the two `toolchain_type`s, the `//:version` `string_flag`,
+  and the `//:default_terraform_script` `nu_binary`.
 - `extensions.bzl` - the `terraform` module extension; generates the
   `@terraform` hub repo (`toolchain()`/`config_setting()` aliases per
   version/platform and per platform, plus third-party modules + one
@@ -677,43 +735,43 @@ behavior is unverified. If something's off, `windows_launcher` in
   from the `.version()`/`.provider()`/`.module()` tags - see
   `private/version.bzl`/`private/provider.bzl` for the per-tag-type logic. Also
   generates the hub's `//:default_script` (an `alias` to `.default_script()`'s
-  `target`, or `private/default_terraform_script.py` if that tag wasn't
+  `target`, or `//:default_terraform_script` if that tag wasn't
   declared) - see Custom workflows above.
 - `defs.bzl` - the public API: just re-exports `terraform_module`/`terraform_root`/
   `terraform_local_provider` from `private/`. Nothing else should load this
   module's `.bzl` files directly other than `defs.bzl`, `extensions.bzl`, and
   `testing.bzl`.
   - `private/common.bzl` - `TerraformModuleInfo`, the shared attrs, the
-    version transition, the hermetic Python toolchain helpers
-    (`py_interpreter`/`py_runtime_files`), `windows_launcher`,
-    `collect_provider_mirror_sources` (merges the toolchain-fetched mirror
+    version transition, `collect_provider_mirror_sources` (merges the toolchain-fetched mirror
     with any `local_providers`), and the staging/validate-action/manifest-
     generation logic both rules use.
   - `private/module.bzl` - `terraform_module`'s rule + implementation.
   - `private/root.bzl` - `terraform_root`'s rule + implementation.
   - `private/local_provider.bzl` - `TerraformLocalProviderInfo`/
     `terraform_local_provider` - see In-repo (local) providers above.
-  - `private/stage_module.py` - the staging build action's script (copies
+  - `private/stage_module.nu` - the staging build action's script (copies
     transitive srcs + registry files into one tree), run via the resolved
-    Python interpreter, not a shell.
-  - `private/validate_module.py` - the `init && validate` build action's
-    script, likewise run via the resolved Python interpreter - builds the
-    provider mirror's `.terraformrc` and any pre-fab `modules.json` itself.
-  - `private/terraform_runner_template.py` - template for `terraform_root`'s
-    `bazel run`/`terraform_root_test` executable; expanded per-target via
-    `ctx.actions.expand_template` (see `_terraform_root_impl`).
-  - `private/terraform_root_test_template.py` - template for
-    `terraform_root_test`'s executable (see `testing.bzl`); just locates
-    `root`'s own executable via runfiles and execs it with `tf_args`.
-  - `private/default_terraform_script.py` - `terraform_root`'s built-in
-    default `script` (see Custom workflows above): auto-`init` then exec
+    `nu`, not a shell.
+  - `private/validate_module.nu` - the `init && validate` build action's
+    script, likewise run via the resolved `nu` - builds the provider
+    mirror's `.terraformrc` and any pre-fab `modules.json` itself.
+  - `private/terraform_runner_template.nu` - template for `terraform_root`'s
+    `bazel run`/`terraform_root_test` entry point; expanded per-target via
+    `ctx.actions.expand_template` (see `_terraform_root_impl`) and run by a
+    `rules_nushell` launcher (see Windows above).
+  - `private/terraform_root_test_template.nu` - template for
+    `terraform_root_test`'s entry point (see `testing.bzl`); just locates
+    `root`'s own executable via runfiles and runs it with `tf_args`.
+  - `private/default_terraform_script.nu` - `terraform_root`'s built-in
+    default `script`, built as the `//:default_terraform_script`
+    `nu_binary` (see Custom workflows above): auto-`init` then exec
     `terraform`, given `TF_BIN`/`TF_MODULE_DIR` in its environment (and
     `TF_MODULE_DIR` as its own cwd), same as any `script` would be.
   - `private/versions.bzl` - generated `TERRAFORM_VERSIONS` checksum mirror,
     see Checksum mirror above. Not loaded by `defs.bzl`/consumers directly -
     only `extensions.bzl` reads it.
-- `scripts/mirror_terraform_versions.py` (+ its `BUILD.bazel`, a
-  `py_binary`) - regenerates `private/versions.bzl`; see Checksum mirror
+- `scripts/mirror_terraform_versions.nu` (+ its `BUILD.bazel`, a
+  `nu_binary`) - regenerates `private/versions.bzl`; see Checksum mirror
   above.
 - `examples/` - `network` (a plain `terraform_module` pinned
   to 1.4.0, using the `hashicorp/random` provider *and* the third-party

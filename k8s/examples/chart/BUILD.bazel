@@ -1,0 +1,9 @@
+load("@rules_k8s//:defs.bzl", "helm_template")
+
+helm_template(
+    name = "hello",
+    srcs = glob(["templates/**"]) + ["values.yaml"],
+    chart_yaml = "Chart.yaml",
+    release_name = "hello-example",
+    visibility = ["//visibility:public"],
+)

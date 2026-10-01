@@ -1,0 +1,19 @@
+module(
+    name = "rules_nushell_examples",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_nushell", version = "0.1.0")
+local_path_override(
+    module_name = "rules_nushell",
+    path = "..",
+)
+
+nushell = use_extension("@rules_nushell//:extensions.bzl", "nushell")
+
+# No `sha256` needed - 0.116.0 is already covered by the generated checksum
+# mirror (private/versions.bzl) - see Checksum mirror in the README.
+nushell.version(version = "0.116.0")
+use_repo(nushell, "nushell")
+
+register_toolchains("@nushell//:all")

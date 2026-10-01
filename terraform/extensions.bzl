@@ -61,7 +61,7 @@ _REGISTRY_MODULE_BZL = str(Label("//:registry_module.bzl"))
 _TOOLCHAIN_TYPE = str(Label("//:toolchain_type"))
 _PROVIDER_TOOLCHAIN_TYPE = str(Label("//:provider_toolchain_type"))
 _VERSION_FLAG = str(Label("//:version"))
-_DEFAULT_TERRAFORM_SCRIPT = str(Label("//:private/default_terraform_script.py"))
+_DEFAULT_TERRAFORM_SCRIPT = str(Label("//:default_terraform_script"))
 
 def _platform_repo_name(platform):
     """The apparent name of the per-platform repo that downloads `platform`'s archives."""
@@ -307,7 +307,7 @@ _default_script_tag = tag_class(
     attrs = {
         "target": attr.label(
             mandatory = True,
-            doc = "Executable target (e.g. `sh_binary`, `py_binary`) or a plain checked-in script with its executable bit set, to use as every terraform_root's `script`, in place of this module's built-in auto-init-then-`terraform` one. An executable target may bundle any number of files in `DefaultInfo.files` (its `DefaultInfo.executable` is what's actually run); a non-executable target must resolve to exactly one file, since there'd otherwise be no single file to mean.",
+            doc = "Executable target (e.g. `nu_binary`, `sh_binary`) or a plain checked-in script with its executable bit set, to use as every terraform_root's `script`, in place of this module's built-in auto-init-then-`terraform` one. An executable target may bundle any number of files in `DefaultInfo.files` (its `DefaultInfo.executable` is what's actually run); a non-executable target must resolve to exactly one file, since there'd otherwise be no single file to mean.",
         ),
     },
 )

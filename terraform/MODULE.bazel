@@ -7,19 +7,19 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 
 # A real (non-dev) dependency: every rule here runs its build actions (and
-# the terraform_root runner) via a hermetic Python interpreter instead of
-# bash - see private/*.py. Registered (not dev_dependency) so the toolchain
-# is visible to consumers too, not just this module's own tests.
-bazel_dep(name = "rules_python", version = "2.3.2")
+# the terraform_root runner) via a hermetic nu (from rules_nushell's
+# toolchain) instead of bash - see private/*.nu. rules_nushell requests its
+# own default Nushell version and registers its toolchains itself, so
+# nothing more is needed here (or from consumers).
+bazel_dep(name = "rules_nushell", version = "0.1.0")
 
-python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(
-    is_default = True,
-    python_version = "3.15",
+# rules_nushell lives alongside this module in the bazel-rules monorepo and
+# isn't released yet - only takes effect when this module is the root one
+# (e.g. developing it, or its mirror script), and is ignored otherwise.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
 )
-use_repo(python, "pythons_hub")
-
-register_toolchains("@pythons_hub//:all")
 
 # Self-use of this module's own `terraform` extension - not for versions/
 # providers/modules (this module declares none of its own), but so

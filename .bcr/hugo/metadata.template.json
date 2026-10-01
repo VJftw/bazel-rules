@@ -1,0 +1,13 @@
+{
+  "homepage": "https://github.com/VJftw/bazel-rules/tree/main/hugo",
+  "maintainers": [
+    {
+      "name": "VJ Patel",
+      "email": "meetthevj@gmail.com",
+      "github": "VJftw"
+    }
+  ],
+  "repository": ["github:VJftw/bazel-rules"],
+  "versions": [],
+  "yanked_versions": {}
+}

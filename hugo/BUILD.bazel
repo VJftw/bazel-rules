@@ -1,0 +1,15 @@
+# Referenced as a hidden-attr default by hugo_build.bzl, and (via a plain
+# Label(), from extensions.bzl's own repository_rule) for the Darwin .pkg
+# extraction step - see extract_pkg.py's own module docstring.
+exports_files([
+    "private/run_hugo.nu",
+    "private/extract_pkg.py",
+])
+
+# The toolchain type that `hugo_toolchain` instances register against, and
+# that `hugo_build`/`hugo_binary` request via their own `toolchains`
+# attribute. See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)

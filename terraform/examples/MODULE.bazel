@@ -17,6 +17,14 @@ local_path_override(
     path = "..",
 )
 
+# rules_terraform's own dependency on rules_nushell (see ../MODULE.bazel) - its
+# local_path_override there only applies when rules_terraform is the root module,
+# so this (root) module needs its own until rules_nushell is released.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../../nushell",
+)
+
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 
 terraform = use_extension("@rules_terraform//:extensions.bzl", "terraform")

@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [terraform]
+        module: [terraform, plantuml, k8s, opa, hugo, nushell]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

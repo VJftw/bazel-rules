@@ -6,6 +6,7 @@ attrs, transition, and staging/validate/manifest logic instead of drifting
 apart.
 """
 
+load("@rules_nushell//:nu.bzl", "run_nu", _NU_TOOLCHAIN_TYPE = "NU_TOOLCHAIN_TYPE", _rlocation_path = "rlocation_path")
 load("//:private/local_provider.bzl", "TerraformLocalProviderInfo")
 load("//:registry_module.bzl", "TerraformRegistryModuleInfo")
 
@@ -21,92 +22,16 @@ TerraformModuleInfo = provider(
 
 TOOLCHAIN_TYPE = str(Label("//:toolchain_type"))
 PROVIDER_TOOLCHAIN_TYPE = str(Label("//:provider_toolchain_type"))
-PY_TOOLCHAIN_TYPE = str(Label("@rules_python//python:toolchain_type"))
+
+# Every build action in this module (staging, validate) runs as a Nushell
+# script via rules_nushell's hermetic, toolchain-resolved `nu` (see
+# `run_nu`), not `ctx.actions.run_shell(...)`, so it doesn't depend on a
+# shell being present on the exec platform. Re-exported for this module's
+# rules' own `toolchains` lists.
+NU_TOOLCHAIN_TYPE = _NU_TOOLCHAIN_TYPE
 _VERSION_FLAG = str(Label("//:version"))
 
-def py_interpreter(ctx):
-    """Returns the hermetic Python interpreter `File` resolved via `PY_TOOLCHAIN_TYPE`.
-
-    Every build action in this module that used to be a bash script (staging,
-    validate) now runs as `ctx.actions.run(executable = py_interpreter(ctx),
-    ...)` instead of `ctx.actions.run_shell(...)`, so it no longer depends on
-    a shell being present on the exec platform.
-
-    Args:
-      ctx: the `terraform_module`/`terraform_root` rule context.
-
-    Returns:
-      The resolved `py3_runtime.interpreter` File.
-    """
-    return ctx.toolchains[PY_TOOLCHAIN_TYPE].py3_runtime.interpreter
-
-def py_runtime_files(ctx):
-    """Returns the depset of support files the resolved Python interpreter needs.
-
-    Args:
-      ctx: the `terraform_module`/`terraform_root` rule context.
-
-    Returns:
-      depset[File] - pass as (part of) a Python-invoking action's `inputs`.
-    """
-    return ctx.toolchains[PY_TOOLCHAIN_TYPE].py3_runtime.files
-
-def windows_launcher(ctx, py_script, interpreter):
-    """Wraps `py_script` in a native `.bat` launcher, if building for Windows.
-
-    Bazel can't directly execute a shebang script there - `DefaultInfo.executable`
-    needs an actual Windows-executable file (.exe/.bat/.cmd). Invokes the
-    resolved (hermetic, rules_python-provided) Python interpreter rather than
-    assuming one is installed on PATH - see the README's Windows section. Not
-    needed on Linux/macOS, where the shebang script itself is directly
-    executable (via its own `#!/usr/bin/env python3` line). Shared by
-    `terraform_root` and `terraform_root_test` - both need a rule attr named
-    `_windows_constraint` (default `@platforms//os:windows`) for this.
-
-    Args:
-      ctx: the rule context (`terraform_root` or `terraform_root_test`).
-      py_script: the already-declared, already-written executable Python
-        script `File`.
-      interpreter: the resolved Python interpreter `File` (see
-        `py_interpreter`), used only on Windows.
-
-    Returns:
-      The `File` that should be `DefaultInfo.executable` - `py_script`
-      itself outside Windows, or a `.bat` sibling that invokes it via the
-      resolved Python interpreter on Windows.
-    """
-    is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo])
-    if not is_windows:
-        return py_script
-
-    bat_script = ctx.actions.declare_file(ctx.label.name + "_runner.bat")
-
-    # Bazel names the runfiles directory after whatever file is
-    # DefaultInfo.executable - which is about to become THIS .bat file, not
-    # py_script - so py_script's own runfiles-lookup boilerplate would look
-    # in the wrong place. Set RUNFILES_DIR explicitly so it uses this
-    # instead of guessing from its own (wrong, from this launcher) argv[0].
-    ctx.actions.write(
-        output = bat_script,
-        is_executable = True,
-        content = (
-            "@echo off\r\n" +
-            "set RUNFILES_DIR=%~dp0{bat_name}.runfiles\r\n" +
-            "\"%RUNFILES_DIR%\\{interpreter_rlocation}\" \"%~dp0{py_name}\" %*\r\n"
-        ).format(
-            bat_name = bat_script.basename,
-            interpreter_rlocation = rlocation_path(ctx, interpreter).replace("/", "\\"),
-            py_name = py_script.basename,
-        ),
-    )
-    return bat_script
-
-def rlocation_path(ctx, file):
-    # short_path is repo-relative; files from external repos get a "../repo/"
-    # prefix instead of living under the main repo's own workspace name.
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return ctx.workspace_name + "/" + file.short_path
+rlocation_path = _rlocation_path
 
 def _staging_relpath(file):
     # Like short_path, but without the "../repo/" external-repo prefix - a
@@ -142,7 +67,7 @@ def collect_provider_mirror_sources(ctx, toolchain_provider_files):
     target lays its single provider out under its own dedicated output
     subtree (see `local_provider.bzl`). Terraform's CLI config supports
     multiple `filesystem_mirror` blocks, one per root, so there's no need to
-    physically merge them - see `validate_action`/`terraform_runner_template.py`.
+    physically merge them - see `validate_action`/`terraform_runner_template.nu`.
 
     Args:
       ctx: the `terraform_module`/`terraform_root` rule context.
@@ -289,7 +214,7 @@ def build_manifest_json(manifest_entries, registry_root, staging_root):
     """Returns a `.terraform/modules/modules.json` document as a JSON string.
 
     Used when every path involved is already known at analysis time (i.e.
-    `validate_action`'s build action) - `private/terraform_runner.py`
+    `validate_action`'s build action) - `private/terraform_runner_template.nu`
     recomputes the equivalent structure itself at runtime instead, since its
     paths (inside a `bazel run`-time scratch dir) aren't known until then.
 
@@ -362,8 +287,8 @@ COMMON_ATTRS = {
     "_allowlist_function_transition": attr.label(
         default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
     ),
-    "_stage_module_py": attr.label(default = "//:private/stage_module.py", allow_single_file = True),
-    "_validate_module_py": attr.label(default = "//:private/validate_module.py", allow_single_file = True),
+    "_stage_module_nu": attr.label(default = "//:private/stage_module.nu", allow_single_file = True),
+    "_validate_module_nu": attr.label(default = "//:private/validate_module.nu", allow_single_file = True),
 }
 
 def collect_transitive_srcs(ctx):
@@ -414,15 +339,15 @@ def stage_module(ctx, transitive_srcs, registry_files):
     manifest = ctx.actions.declare_file(ctx.label.name + "_stage_manifest.json")
     ctx.actions.write(output = manifest, content = json.encode(pairs))
 
-    ctx.actions.run(
+    run_nu(
+        ctx,
+        script = ctx.file._stage_module_nu,
         outputs = [staging_dir],
         inputs = depset(
             [manifest],
-            transitive = [transitive_srcs, py_runtime_files(ctx)] + [e.info.files for e in registry_files],
+            transitive = [transitive_srcs] + [e.info.files for e in registry_files],
         ),
-        executable = py_interpreter(ctx),
-        tools = [ctx.file._stage_module_py],
-        arguments = [ctx.file._stage_module_py.path, "--manifest", manifest.path, "--out", staging_dir.path],
+        arguments = ["--manifest", manifest.path, "--out", staging_dir.path],
         mnemonic = "TerraformStageModule",
         progress_message = "Staging Terraform module %s" % ctx.label,
     )
@@ -446,7 +371,8 @@ def validate_action(ctx, staging_dir, module_relpath, terraform_bin, provider_mi
       The declared `.validated` marker `File`.
     """
     inputs = [staging_dir]
-    transitive_inputs = [py_runtime_files(ctx)]
+    transitive_inputs = []
+    mirror_roots = []
     extra_args = []
 
     for provider_files in provider_mirror_sources:
@@ -454,12 +380,12 @@ def validate_action(ctx, staging_dir, module_relpath, terraform_bin, provider_mi
         if mirror_root != None:
             # `mirror_root` is only known here as an execroot-relative path,
             # and the action absolute-ifies it itself (see
-            # validate_module.py) - a relative path baked into the CLI
+            # validate_module.nu) - a relative path baked into the CLI
             # config file's content wouldn't survive Terraform's own
             # `-chdir` (which changes the process's cwd before anything
             # reads the config's provider mirror `path`).
             transitive_inputs.append(provider_files)
-            extra_args += ["--provider-mirror-root", mirror_root]
+            mirror_roots.append(mirror_root)
 
     if manifest_entries:
         manifest_seed = ctx.actions.declare_file(ctx.label.name + "_modules_seed.json")
@@ -479,23 +405,23 @@ def validate_action(ctx, staging_dir, module_relpath, terraform_bin, provider_mi
     # a `.tf` file gets renamed - Bazel always rebuilds `staging_dir`
     # correctly, but a naive copy of it wouldn't be resynced the same way),
     # point `-chdir` straight at it and only let TF_DATA_DIR (a plain scratch
-    # dir the action creates itself - see validate_module.py) be writable.
+    # dir the action creates itself - see validate_module.nu) be writable.
     marker = ctx.actions.declare_file(ctx.label.name + ".validated")
 
-    ctx.actions.run(
+    run_nu(
+        ctx,
+        script = ctx.file._validate_module_nu,
         outputs = [marker],
         inputs = depset(inputs, transitive = transitive_inputs),
-        executable = py_interpreter(ctx),
-        tools = [terraform_bin, ctx.file._validate_module_py],
+        tools = [terraform_bin],
         arguments = [
-            ctx.file._validate_module_py.path,
             "--terraform-bin",
             terraform_bin.path,
             "--module-dir",
             staging_dir.path + "/" + module_relpath,
             "--marker",
             marker.path,
-        ] + extra_args,
+        ] + extra_args + mirror_roots,
         mnemonic = "TerraformValidate",
         progress_message = "Validating Terraform module %s" % ctx.label,
     )

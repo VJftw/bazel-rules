@@ -1,14 +1,24 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@rules_nushell//:defs.bzl", "nu_binary")
 
-# Referenced as hidden-attr defaults (e.g. `_stage_module_py`) by rules in
+# Referenced as hidden-attr defaults (e.g. `_stage_module_nu`) by rules in
 # private/module.bzl, private/root.bzl, and testing.bzl.
 exports_files([
-    "private/stage_module.py",
-    "private/validate_module.py",
-    "private/terraform_runner_template.py",
-    "private/terraform_root_test_template.py",
-    "private/default_terraform_script.py",
+    "private/stage_module.nu",
+    "private/validate_module.nu",
+    "private/terraform_runner_template.nu",
+    "private/terraform_root_test_template.nu",
 ])
+
+# What every `terraform_root`'s `bazel run`/`terraform_root_test` hands off
+# to, unless `terraform.default_script(target = ...)` names another one (see
+# extensions.bzl/private/root.bzl): auto-`init` before `plan`/`apply`/etc,
+# then exec `terraform` itself.
+nu_binary(
+    name = "default_terraform_script",
+    src = "private/default_terraform_script.nu",
+    visibility = ["//visibility:public"],
+)
 
 # The toolchain type that `terraform_toolchain` instances register against, and
 # that `terraform_module` requests via its `toolchains` attribute.

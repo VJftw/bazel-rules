@@ -1,10 +1,11 @@
 """`terraform_root`. Not part of the public API - `//:defs.bzl` re-exports it."""
 
+load("@rules_nushell//:nu.bzl", "NU_LAUNCHER_ATTRS", "nu_launcher")
 load(
     "//:private/common.bzl",
     "COMMON_ATTRS",
+    "NU_TOOLCHAIN_TYPE",
     "PROVIDER_TOOLCHAIN_TYPE",
-    "PY_TOOLCHAIN_TYPE",
     "TOOLCHAIN_TYPE",
     "TerraformModuleInfo",
     "VERSION_TRANSITION",
@@ -13,15 +14,12 @@ load(
     "collect_registry_files",
     "collect_transitive_srcs",
     "manifest_entries_to_json",
-    "py_interpreter",
-    "py_runtime_files",
     "rlocation_path",
     "stage_module",
     "validate_action",
-    "windows_launcher",
 )
 
-_RUNNER_TEMPLATE = Label("//:private/terraform_runner_template.py")
+_RUNNER_TEMPLATE = Label("//:private/terraform_runner_template.nu")
 
 # What `bazel run`/`bazel test` (terraform_root_test) hands off to, always -
 # an `alias` to whatever `terraform.default_script(target = ...)` requested
@@ -78,8 +76,8 @@ def _resolve_env_labels(ctx):
 def _resolve_script(ctx):
     """Resolves `ctx.attr._script` (see `_SCRIPT` above) to its rlocation path, plus the files/runfiles it needs.
 
-    Accepts two shapes of target: an executable rule (`sh_binary`,
-    `py_binary`, etc. - anything with `executable = True`), identified via
+    Accepts two shapes of target: an executable rule (`nu_binary`,
+    `sh_binary`, etc. - anything with `executable = True`), identified via
     `files_to_run.executable` (the queryable accessor for what a rule
     constructed `DefaultInfo(executable = ...)` with - that field itself
     isn't readable back off a fetched `DefaultInfo`) regardless of how many
@@ -109,7 +107,7 @@ def _resolve_script(ctx):
             fail((
                 "terraform.default_script(target = {dep}) produces {n} files " +
                 "and isn't executable - point it at an executable target " +
-                "(e.g. sh_binary, py_binary) or one with a single output " +
+                "(e.g. nu_binary, sh_binary) or one with a single output " +
                 "instead."
             ).format(dep = target.label, n = len(files)))
         executable = files[0]
@@ -144,7 +142,7 @@ def _terraform_root_impl(ctx):
     # `collect_provider_mirror_sources`) - the runner reconstructs each
     # source's own mirror root from its representative file's rlocation path
     # at runtime (rlocation paths, unlike build-time paths, aren't known
-    # until then) - see `terraform_runner_template.py`.
+    # until then) - see `terraform_runner_template.nu`.
     provider_repr_rlocations = []
     for files in provider_mirror_sources:
         files_list = files.to_list()
@@ -154,16 +152,15 @@ def _terraform_root_impl(ctx):
     manifest_file = ctx.actions.declare_file(ctx.label.name + "_runner_manifest.json")
     ctx.actions.write(output = manifest_file, content = manifest_entries_to_json(manifest_entries))
 
-    script = ctx.actions.declare_file(ctx.label.name + "_runner.py")
+    script = ctx.actions.declare_file(ctx.label.name + "_runner.nu")
     ctx.actions.expand_template(
         template = ctx.file._runner_template,
         output = script,
-        is_executable = True,
         substitutions = {
             "%{tf_rlocation}%": rlocation_path(ctx, terraform_bin),
             "%{provider_repr_rlocations_json}%": json.encode(provider_repr_rlocations),
-            "%{staging_basename}%": staging_dir.basename,
-            "%{manifest_basename}%": manifest_file.basename,
+            "%{staging_rlocation}%": rlocation_path(ctx, staging_dir),
+            "%{manifest_rlocation}%": rlocation_path(ctx, manifest_file),
             "%{module_relpath}%": module_relpath,
             "%{label_key}%": (ctx.label.package + "/" + ctx.label.name).replace("/", "_"),
             # `str(ctx.label)` renders bzlmod's full canonical form (e.g.
@@ -180,15 +177,13 @@ def _terraform_root_impl(ctx):
         },
     )
 
-    interpreter = py_interpreter(ctx)
-    executable = windows_launcher(ctx, script, interpreter)
+    launcher = nu_launcher(ctx, script)
+    executable = launcher.executable
 
-    runfiles = ctx.runfiles(files = [terraform_bin, staging_dir, script, manifest_file, interpreter] + env_label_files + script_files)
-    runfiles = runfiles.merge_all([
+    runfiles = ctx.runfiles(files = [terraform_bin, staging_dir, manifest_file] + env_label_files + script_files)
+    runfiles = runfiles.merge_all([launcher.runfiles] + [
         ctx.runfiles(transitive_files = files)
         for files in provider_mirror_sources
-    ] + [
-        ctx.runfiles(transitive_files = py_runtime_files(ctx)),
     ] + env_label_runfiles + script_runfiles)
 
     return [
@@ -251,11 +246,11 @@ terraform_root = rule(
     notification. This target's own `env`/`env_labels` attrs (see below) are
     set in its environment too.
 
-    Runs as a Python script (via a hermetic interpreter resolved from
-    rules_python's toolchain, not bash) - on Windows, `bazel run`'s
-    executable is a small `.bat` launcher that invokes that same resolved
-    interpreter (see the README's Windows section); everything else is
-    identical.
+    Runs as a Nushell script, via rules_nushell's hermetic,
+    toolchain-resolved `nu` (not bash, or whatever else is on the machine):
+    `bazel run`'s executable is a tiny generated launcher for it - a
+    `/bin/sh` script, or a `.bat` on Windows (see the README's Windows
+    section); everything else is identical.
     """,
     attrs = dict(
         COMMON_ATTRS,
@@ -268,7 +263,7 @@ terraform_root = rule(
         ),
         _runner_template = attr.label(default = _RUNNER_TEMPLATE, allow_single_file = True),
         _script = attr.label(allow_files = True, default = _SCRIPT),
-        _windows_constraint = attr.label(default = "@platforms//os:windows"),
+        **NU_LAUNCHER_ATTRS
     ),
-    toolchains = [TOOLCHAIN_TYPE, PROVIDER_TOOLCHAIN_TYPE, PY_TOOLCHAIN_TYPE],
+    toolchains = [TOOLCHAIN_TYPE, PROVIDER_TOOLCHAIN_TYPE, NU_TOOLCHAIN_TYPE],
 )

@@ -1,0 +1,25 @@
+load("@rules_opa//:defs.bzl", "opa_build", "opa_eval", "opa_test")
+
+opa_build(
+    name = "bundle",
+    srcs = [
+        "authz.rego",
+        "authz_test.rego",
+    ],
+)
+
+opa_eval(
+    name = "allow_get",
+    srcs = ["authz.rego"],
+    fail_undefined = True,
+    input = "input.json",
+    query = "data.authz.allow",
+)
+
+opa_test(
+    name = "authz_test",
+    srcs = [
+        "authz.rego",
+        "authz_test.rego",
+    ],
+)

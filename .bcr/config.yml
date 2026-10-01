@@ -4,3 +4,8 @@
 # See https://github.com/bazel-contrib/publish-to-bcr
 moduleRoots:
   - terraform
+  - plantuml
+  - k8s
+  - opa
+  - hugo
+  - nushell

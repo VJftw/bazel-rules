@@ -1,0 +1,6 @@
+load("//:defs.bzl", "nu_binary")
+
+nu_binary(
+    name = "mirror_nushell_versions",
+    src = "mirror_nushell_versions.nu",
+)

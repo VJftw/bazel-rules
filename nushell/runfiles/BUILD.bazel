@@ -1,0 +1,6 @@
+# The `runfiles.nu` module every nu_launcher-run script can `use` - see
+# //:nu.bzl.
+exports_files(
+    ["runfiles.nu"],
+    visibility = ["//visibility:public"],
+)

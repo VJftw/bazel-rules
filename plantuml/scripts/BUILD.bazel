@@ -1,0 +1,6 @@
+load("@rules_nushell//:defs.bzl", "nu_binary")
+
+nu_binary(
+    name = "mirror_plantuml_versions",
+    src = "mirror_plantuml_versions.nu",
+)

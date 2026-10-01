@@ -1,0 +1,15 @@
+# Tooling for this repository itself (not a released module - it lives under
+# .github/, so registry.nu's module discovery ignores it): runs
+# scripts/registry.nu with the repo's own Nushell rules.
+#
+#   cd .github && bazel run //scripts:registry -- <subcommand> ...
+module(
+    name = "bazel_rules_tooling",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_nushell", version = "0.1.0")
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
+)

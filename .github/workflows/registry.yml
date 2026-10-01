@@ -1,0 +1,31 @@
+name: Registry
+
+# Every change to a module's released contents must come with the version
+# the pull request's (Conventional Commit) title implies, and an up-to-date
+# registry/ entry for it - which release.yml publishes once it merges. See
+# .github/scripts/registry.nu, and `registry bump` to fix a failure.
+#
+# Separate from ci.yml so that editing the pull request's title re-runs just
+# this, not every module's tests.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  version-bumps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so the check can find where this branch diverged
+          # from the base branch.
+          fetch-depth: 0
+
+      - name: Check changed modules have the right, registered versions
+        env:
+          # Via the environment rather than inline, so the title is never
+          # interpreted by the shell.
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: origin/${{ github.base_ref }}
+        working-directory: .github
+        run: bazel run //scripts:registry -- check --title "$TITLE" --base "$BASE"

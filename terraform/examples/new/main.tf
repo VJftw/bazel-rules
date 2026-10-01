@@ -1,0 +1,8 @@
+terraform {
+  required_version = "= 1.6.0"
+}
+
+module "network" {
+  source = "../network"
+  name   = "new"
+}

@@ -1,0 +1,12 @@
+load("@rules_hugo//:defs.bzl", "hugo_site")
+
+# `bazel run //site:public_hugo -- server` for local preview.
+hugo_site(
+    name = "public",
+    srcs = glob([
+        "content/**",
+        "layouts/**",
+    ]),
+    config = "hugo.toml",
+    minify = True,
+)

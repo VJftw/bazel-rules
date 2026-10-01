@@ -1,0 +1,30 @@
+module(
+    name = "rules_k8s_examples",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_k8s", version = "0.1.0")
+local_path_override(
+    module_name = "rules_k8s",
+    path = "..",
+)
+
+# rules_k8s's own dependency on rules_nushell (see ../MODULE.bazel) - its
+# local_path_override there only applies when rules_k8s is the root module,
+# so this (root) module needs its own until rules_nushell is released.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../../nushell",
+)
+
+k8s = use_extension("@rules_k8s//:extensions.bzl", "k8s")
+
+# No `sha256` needed for any of the three - all pinned versions below are
+# already covered by their own generated checksum mirror (private/versions.bzl)
+# - see Checksum mirror in the README.
+k8s.kustomize(version = "5.8.1")
+k8s.helm(version = "3.22.0")
+k8s.kubectl(version = "1.37.1")
+use_repo(k8s, "k8s")
+
+register_toolchains("@k8s//:all")

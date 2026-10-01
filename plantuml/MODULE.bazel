@@ -1,0 +1,25 @@
+module(
+    name = "rules_plantuml",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+
+# dev_dependency: only scripts/mirror_plantuml_versions.nu (a maintainer
+# tool, not part of any rule this module ships) needs Nushell -
+# plantuml_diagram/plantuml_library themselves are pure JVM. Marking it dev
+# means a consumer's own build never sees this dependency or its toolchain
+# registration at all - see rules_terraform's/rules_k8s's own MODULE.bazel
+# for the contrasting case where Nushell really is needed at consumer build
+# time, so it's a real (non-dev) dependency there instead. rules_nushell
+# requests its own default Nushell version and registers its toolchains
+# itself, so nothing more is needed here.
+bazel_dep(name = "rules_nushell", version = "0.1.0", dev_dependency = True)
+
+# rules_nushell lives alongside this module in the bazel-rules monorepo and
+# isn't released yet - overrides only ever take effect from the root module
+# anyway.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
+)

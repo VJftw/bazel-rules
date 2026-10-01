@@ -1,0 +1,17 @@
+module(
+    name = "rules_nushell",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# This module's own default Nushell version - a non-root module's request
+# applies whenever the root module doesn't declare one (see extensions.bzl),
+# and the toolchains are registered here too, so neither a consumer of this
+# module nor a ruleset that uses Nushell internally (via //:nu.bzl) needs any
+# Nushell configuration of its own beyond a `bazel_dep`.
+nushell = use_extension("//:extensions.bzl", "nushell")
+nushell.version(version = "0.116.0")
+use_repo(nushell, "nushell")
+
+register_toolchains("@nushell//:all")

@@ -1,0 +1,8 @@
+load("@rules_k8s//:defs.bzl", "kustomize_build")
+
+kustomize_build(
+    name = "hello_prod",
+    srcs = ["//base:srcs"],
+    kustomization = "kustomization.yaml",
+    visibility = ["//visibility:public"],
+)

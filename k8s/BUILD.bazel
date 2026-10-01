@@ -1,0 +1,25 @@
+# Referenced as hidden-attr defaults by rules in private/helm_template.bzl
+# and private/kustomize_build.bzl.
+exports_files([
+    "private/capture_stdout.nu",
+    "private/stage_files.nu",
+])
+
+# The toolchain types that `kustomize_toolchain`/`helm_toolchain`/
+# `kubectl_toolchain` instances register against, and that
+# `kustomize_build`/`helm_template`/`kubectl_binary` request via their own
+# `toolchains` attribute. See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "kustomize_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "helm_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "kubectl_toolchain_type",
+    visibility = ["//visibility:public"],
+)

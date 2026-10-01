@@ -1,0 +1,19 @@
+load("@rules_nushell//:defs.bzl", "nu_binary", "nu_test")
+
+# `bazel run //app:hello -- World`
+nu_binary(
+    name = "hello",
+    src = "hello.nu",
+    deps = ["//lib:shout"],
+)
+
+nu_test(
+    name = "hello_test",
+    src = "hello_test.nu",
+    args = ["World"],
+    data = ["name.txt"],
+    deps = [
+        "//lib:greeting",
+        "//lib:shout",
+    ],
+)

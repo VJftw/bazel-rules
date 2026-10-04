@@ -3,7 +3,7 @@
 A mirror of PlantUML release checksums - Maven Central publishes no
 checksum/signature file for this artifact at all, so this was computed by
 downloading each version's own jar and hashing it locally (see this
-script's own module docstring). Used by extensions.bzl as the default
+script's own header comment). Used by extensions.bzl as the default
 `sha256` for a `plantuml.version(...)` tag that doesn't supply one - an
 explicit `sha256` on the tag always overrides this.
 """

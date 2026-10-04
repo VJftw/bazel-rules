@@ -1,0 +1,5 @@
+{
+  "url": "https://github.com/VJftw/bazel-rules/releases/download/k8s-v0.1.1/rules_k8s-k8s-v0.1.1.tar",
+  "integrity": "sha256-/PTSFiJMTiuHl3FZmn1VUqRyYMmhawTRel39KEsy1Nk=",
+  "strip_prefix": ""
+}

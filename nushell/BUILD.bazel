@@ -1,0 +1,10 @@
+# Referenced as a hidden-attr default by the rules in private/nu_binary.bzl.
+exports_files(["private/nu_runner_template.nu"])
+
+# The toolchain type that `nu_toolchain` instances register against, and
+# that `nu_binary`/`nu_test` request via their own `toolchains` attribute.
+# See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)

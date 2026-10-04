@@ -1,0 +1,16 @@
+load("@rules_nushell//:defs.bzl", "nu_binary")
+
+nu_binary(
+    name = "mirror_kustomize_versions",
+    src = "mirror_kustomize_versions.nu",
+)
+
+nu_binary(
+    name = "mirror_helm_versions",
+    src = "mirror_helm_versions.nu",
+)
+
+nu_binary(
+    name = "mirror_kubectl_versions",
+    src = "mirror_kubectl_versions.nu",
+)

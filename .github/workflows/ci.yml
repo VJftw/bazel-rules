@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [terraform, plantuml, k8s, opa, hugo, nushell]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # `bazel test` exits 4 when everything built but there are no test
+      # targets to run (e.g. a module with only build rules and no tests) -
+      # that's a success here.
+      - name: bazel test //... (module)
+        working-directory: ${{ matrix.module }}
+        run: |
+          rc=0
+          bazel test //... || rc=$?
+          if [ "$rc" -eq 4 ]; then rc=0; fi
+          exit "$rc"
+
+      - name: bazel test //... (module examples)
+        if: hashFiles(format('{0}/examples/MODULE.bazel', matrix.module)) != ''
+        working-directory: ${{ matrix.module }}/examples
+        run: |
+          rc=0
+          bazel test //... || rc=$?
+          if [ "$rc" -eq 4 ]; then rc=0; fi
+          exit "$rc"

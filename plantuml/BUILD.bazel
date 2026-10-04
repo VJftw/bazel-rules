@@ -1,0 +1,7 @@
+# The toolchain type that `plantuml_toolchain` instances register against,
+# and that `plantuml_diagram` requests via its `toolchains` attribute.
+# See https://bazel.build/extending/toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,20 @@
+# Aggregates every rendered manifest in this example workspace into one
+# target - `bazel build //:manifests` produces all three files.
+load("@rules_k8s//:defs.bzl", "k8s_manifests", "kubectl_binary")
+
+k8s_manifests(
+    name = "manifests",
+    deps = [
+        "//chart:hello",
+        "//chart_kustomize:hello_prod",
+        "//overlay:hello_prod",
+    ],
+)
+
+# `@k8s//:kubectl` (generated automatically by `k8s.kubectl(...)` - see
+# MODULE.bazel) already works with no BUILD.bazel wiring at all; this local
+# instance just demonstrates declaring your own, e.g. for a different
+# visibility. `bazel run //:kubectl -- version --client`.
+kubectl_binary(
+    name = "kubectl",
+)

@@ -1,0 +1,19 @@
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@rules_terraform//:defs.bzl", "terraform_module")
+
+terraform_module(
+    name = "network",
+    srcs = ["main.tf"],
+    registry_modules = {
+        "label": "@terraform//:module_label",
+    },
+    version = "1.4.0",
+    visibility = ["//:__subpackages__"],
+)
+
+# `network` isn't executable on its own (it's a plain terraform_module), so
+# there's no `plan` to run - this just asserts it builds/validates standalone.
+build_test(
+    name = "network_build_test",
+    targets = [":network"],
+)

@@ -1,0 +1,33 @@
+load("@rules_plantuml//:defs.bzl", "plantuml_diagram", "plantuml_library")
+
+plantuml_diagram(
+    name = "hello_svg",
+    src = "hello.puml",
+    format = "svg",
+)
+
+plantuml_diagram(
+    name = "hello_png",
+    src = "hello.puml",
+    format = "png",
+)
+
+# theme depends on theme_colors, demonstrating a plantuml_library's own deps
+# composing transitively - themed_svg below only lists ":theme" and never
+# has to know theme_colors.iuml exists.
+plantuml_library(
+    name = "theme_colors",
+    srcs = ["theme_colors.iuml"],
+)
+
+plantuml_library(
+    name = "theme",
+    srcs = ["theme.iuml"],
+    deps = [":theme_colors"],
+)
+
+plantuml_diagram(
+    name = "themed_svg",
+    src = "themed.puml",
+    deps = [":theme"],
+)

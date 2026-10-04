@@ -1,0 +1,27 @@
+module(
+    name = "rules_opa_examples",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_opa", version = "0.1.0")
+local_path_override(
+    module_name = "rules_opa",
+    path = "..",
+)
+
+# rules_opa's own dependency on rules_nushell (see ../MODULE.bazel) - its
+# local_path_override there only applies when rules_opa is the root module,
+# so this (root) module needs its own until rules_nushell is released.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../../nushell",
+)
+
+opa = use_extension("@rules_opa//:extensions.bzl", "opa")
+
+# No `sha256` needed - 1.20.2 is already covered by the generated checksum
+# mirror (private/versions.bzl) - see Checksum mirror in the README.
+opa.version(version = "1.20.2")
+use_repo(opa, "opa")
+
+register_toolchains("@opa//:all")

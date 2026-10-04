@@ -1,0 +1,60 @@
+name: Release
+
+# Publishes every module version that has a registry/ entry but no GitHub
+# Release yet - i.e. whatever a just-merged pull request added (see
+# .github/scripts/registry.nu). Each is released as its own `<module>-vX.Y.Z`
+# tag, created here (pointing at the merged commit), with the module's
+# release archive attached.
+#
+# Never pushes to main - the registry entry already arrived through the pull
+# request, so this works with branch protection on main.
+on:
+  push:
+    branches: [main]
+  # To retry a release that failed part-way, e.g. a transient network error.
+  workflow_dispatch:
+
+# One at a time, so two quick merges can't race to release the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release new module versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Run from .github/, where the tooling's Bazel workspace is (and
+          # not reading stdin, which the loop below is reading from).
+          registry() {
+            (cd .github && bazel run --noshow_progress //scripts:registry -- "$@" </dev/null)
+          }
+
+          registry releasable | while read -r module tag; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "${module}: ${tag} is already released"
+              continue
+            fi
+
+            # The registry entry was written (in the pull request) from a
+            # reproducible build of this same archive - --verify refuses to
+            # publish anything that doesn't match what consumers will check
+            # it against.
+            archive="rules_${module}-${tag}.tar"
+            registry archive "$module" --out "$PWD/$archive" --verify
+
+            echo "${module}: releasing ${tag}"
+            gh release create "$tag" "$archive" \
+              --target "$GITHUB_SHA" \
+              --title "${module} ${tag}" \
+              --generate-notes
+          done

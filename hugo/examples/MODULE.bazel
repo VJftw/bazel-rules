@@ -1,0 +1,32 @@
+module(
+    name = "rules_hugo_examples",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_hugo", version = "0.1.0")
+local_path_override(
+    module_name = "rules_hugo",
+    path = "..",
+)
+
+# rules_hugo's own dependency on rules_nushell (see ../MODULE.bazel) - its
+# local_path_override there only applies when rules_hugo is the root module,
+# so this (root) module needs its own until rules_nushell is released.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../../nushell",
+)
+
+hugo = use_extension("@rules_hugo//:extensions.bzl", "hugo")
+hugo.version(
+    sha256 = {
+        "darwin_universal": "5ac468a54ccd99bd3bfcdacadec25f6fcd6c0606dccfa86bb761d400d3f0a680",
+        "linux_amd64": "0e39b901e3f919f1daae05c8ff64f0c14c8a348ef46886d63f8e6d1bb2653885",
+        "linux_arm64": "4b282afd8181e5ed182f50f293fc24dd6c42bfa569e555d53bfbc5ee6a1b2982",
+        "windows_amd64": "51e4512ff343e7a2b9d879028a92177d090031c71e7a6a2a3d7cba8536202e80",
+    },
+    version = "0.166.0",
+)
+use_repo(hugo, "hugo")
+
+register_toolchains("@hugo//:all")

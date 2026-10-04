@@ -1,0 +1,63 @@
+load("@rules_terraform//:defs.bzl", "terraform_local_provider", "terraform_module")
+load(":local_provider_test.bzl", "local_provider_layout_test")
+load(":manifest_test.bzl", "missing_dep_sources_test", "ok_dep_sources_test")
+
+# `network` (see //network) has a hermetic `registry_modules`
+# entry beneath it, so a `deps` entry referencing it needs `dep_sources` too -
+# these fixtures exercise both sides of that requirement. Not meant to be
+# built for real (the first is expected to fail analysis) - `manual` keeps
+# them out of `bazel build //...`.
+
+terraform_module(
+    name = "missing_dep_sources_fixture",
+    srcs = ["fixture.tf"],
+    tags = ["manual"],
+    # dep_sources deliberately omitted - this should fail analysis.
+    version = "1.4.0",
+    deps = {"network": "//network"},
+)
+
+terraform_module(
+    name = "ok_dep_sources_fixture",
+    srcs = ["fixture.tf"],
+    dep_sources = {"network": "../network"},
+    tags = ["manual"],
+    version = "1.4.0",
+    deps = {"network": "//network"},
+)
+
+missing_dep_sources_test(
+    name = "missing_dep_sources_test",
+    target_under_test = ":missing_dep_sources_fixture",
+)
+
+ok_dep_sources_test(
+    name = "ok_dep_sources_test",
+    target_under_test = ":ok_dep_sources_fixture",
+)
+
+# Not a real provider (never executed) - just enough of an executable target
+# (`terraform_local_provider`'s `binary` requires an executable *rule*
+# output, e.g. what a real go_binary/etc would give it - not a plain source
+# file) to exercise terraform_local_provider's mirror-layout analysis logic
+# below.
+genrule(
+    name = "fake_provider_bin",
+    srcs = ["fake_provider.sh"],
+    outs = ["fake_provider_bin.sh"],
+    cmd = "cp $< $@",
+    executable = True,
+)
+
+terraform_local_provider(
+    name = "fake_provider",
+    binary = ":fake_provider_bin",
+    hostname = "local",
+    source = "myorg/myprovider",
+    version = "0.1.0",
+)
+
+local_provider_layout_test(
+    name = "local_provider_layout_test",
+    target_under_test = ":fake_provider",
+)

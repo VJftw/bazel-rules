@@ -1,0 +1,19 @@
+module(
+    name = "rules_plantuml_examples",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_plantuml", version = "0.1.0")
+local_path_override(
+    module_name = "rules_plantuml",
+    path = "..",
+)
+
+plantuml = use_extension("@rules_plantuml//:extensions.bzl", "plantuml")
+
+# No `sha256` needed - 8059 is already covered by the generated checksum
+# mirror (private/versions.bzl) - see Checksum mirror in the README.
+plantuml.version(version = "8059")
+use_repo(plantuml, "plantuml")
+
+register_toolchains("@plantuml//:all")

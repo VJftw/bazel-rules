@@ -1,0 +1,19 @@
+# Sanity-checks a released rules_plantuml version by building its own
+# examples/ module (a separate bzlmod module that consumes rules_plantuml
+# the same way any real user would).
+#
+# No Windows caveat here (unlike terraform/k8s/opa) - PlantUML is a plain,
+# platform-independent jar run via a Bazel-fetched JVM, so it's expected to
+# behave the same on every platform Bazel itself already supports.
+bcr_test_module:
+  module_path: "examples"
+  matrix:
+    platform: ["debian11", "macos", "windows"]
+    bazel: ["7.x", "8.x"]
+  tasks:
+    run_tests:
+      name: "Run test module"
+      platform: ${{ platform }}
+      bazel: ${{ bazel }}
+      test_targets:
+        - "//..."

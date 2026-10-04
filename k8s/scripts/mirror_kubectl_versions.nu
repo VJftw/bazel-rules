@@ -2,10 +2,10 @@
 # release checksums, used by extensions.bzl as the default `sha256` for a
 # `k8s.kubectl(...)` tag that doesn't supply one for a given platform.
 #
-# Incremental, unlike every other mirror script in this repo: only versions
-# not already present in the existing kubectl_versions.bzl are fetched at
-# all - existing entries are carried over as-is, never re-fetched or
-# re-verified. This is deliberate, not just an optimization - kubectl
+# Incremental, like every other mirror script in this repo: only versions not
+# already present in the existing kubectl_versions.bzl are fetched at all -
+# existing entries are carried over as-is, never re-fetched or re-verified.
+# Here that's essential, not just an optimization - kubectl
 # actually signs its release binaries via sigstore/cosign keyless signing (a
 # `.sig`/`.cert` pair alongside each binary), verified here (see
 # `verify-and-hash` below), unlike kustomize/OPA's plain-HTTPS-only mirrors.
@@ -34,6 +34,17 @@
 const GITHUB_API = "https://api.github.com/repos/kubernetes/kubernetes/releases"
 const DL_K8S_IO = "https://dl.k8s.io"
 const USER_AGENT = "bazel-rules-mirror-script"
+
+# Authenticates to the GitHub API with $GITHUB_TOKEN when it's set (e.g. in
+# the nightly workflow) - unauthenticated requests are limited to 60 an hour.
+def github-api-headers []: nothing -> list<string> {
+    let token = ($env.GITHUB_TOKEN? | default "")
+    if $token == "" {
+        [User-Agent $USER_AGENT]
+    } else {
+        [User-Agent $USER_AGENT Authorization $"Bearer ($token)"]
+    }
+}
 const MAJOR = "1"
 
 # The identity Kubernetes' own release automation signs with - not
@@ -59,18 +70,50 @@ def fetch [url: string]: nothing -> binary {
     http get --raw --headers [User-Agent $USER_AGENT] $url | into binary
 }
 
-def list-versions []: nothing -> list<string> {
-    generate {|page|
-        let releases = (http get --headers [User-Agent $USER_AGENT] $"($GITHUB_API)?per_page=100&page=($page)")
-        if ($releases | is-empty) { {} } else { {out: $releases, next: ($page + 1)} }
-    } 1
-    | flatten
+# Releases are only looked up until this many in a row are already mirrored -
+# see `list-new-versions`.
+const STOP_AFTER_MIRRORED = 20
+
+# The versions in a page of GitHub releases that this mirror covers.
+def release-versions [releases: list]: nothing -> list<string> {
+    $releases
     | where {|r| not $r.prerelease }
     | get tag_name
     | parse --regex ('^v(?<version>' + $MAJOR + '\.[0-9]+\.[0-9]+)$')
     | get version
 }
 
+# The versions released since `mirrored` were. GitHub lists releases newest
+# (created) first, so this walks that list until it's seen STOP_AFTER_MIRRORED
+# releases in a row that are already mirrored - which still catches a release
+# for an older line cut after newer ones (e.g. a backported patch), or one
+# whose assets were only uploaded after the last refresh, but never pages back
+# through old releases that never had anything to mirror.
+def list-new-versions [mirrored: list<string>]: nothing -> list<string> {
+    generate {|state|
+        if $state.done { return {} }
+        let releases = (http get --headers (github-api-headers) $"($GITHUB_API)?per_page=100&page=($state.page)")
+        if ($releases | is-empty) { return {} }
+        mut run = $state.run
+        mut new = []
+        for version in (release-versions $releases) {
+            if $version in $mirrored {
+                $run += 1
+                if $run >= $STOP_AFTER_MIRRORED { break }
+            } else {
+                $run = 0
+                $new = ($new | append $version)
+            }
+        }
+        {out: $new, next: {page: ($state.page + 1), run: $run, done: ($run >= $STOP_AFTER_MIRRORED)}}
+    } {page: 1, run: 0, done: false}
+    | flatten
+}
+
+# The versions already mirrored in `versions_file` (its `KUBECTL_VERSIONS =
+# {...}`), if it exists - only versions that aren't in it yet are looked up.
+# (Nushell's `from json` accepts the trailing commas buildifier, which formats
+# the committed file, adds.)
 def load-existing [versions_file: string]: nothing -> record {
     if not ($versions_file | path exists) {
         return {}
@@ -152,10 +195,10 @@ def main [] {
     let existing = (load-existing $versions_file)
     print --stderr $"($existing | columns | length) versions already mirrored"
 
-    let new_versions = (list-versions | where {|v| $v not-in ($existing | columns) })
+    let new_versions = (list-new-versions ($existing | columns))
     print --stderr $"Found ($new_versions | length) new kubectl ($MAJOR).x release\(s\) to process"
 
-    let result = ($new_versions | reduce --fold $existing {|version, acc|
+    let new_entries = ($new_versions | reduce --fold {} {|version, acc|
         print --stderr $"Processing kubectl ($version)..."
         let platform_shas = ($PLATFORMS | columns | reduce --fold {} {|platform, shas|
             let verified = (verify-and-hash $version $platform)
@@ -168,6 +211,8 @@ def main [] {
         })
         if ($platform_shas | is-empty) { $acc } else { $acc | insert $version $platform_shas }
     })
+    # Newest first, as the release listings are, ahead of what was already there.
+    let result = ($new_entries | merge $existing)
 
     let header = [
         r#'"""GENERATED incrementally (see this script's own header comment) by'#

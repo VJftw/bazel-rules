@@ -7,6 +7,11 @@
 # to a real `gpg` binary on PATH for signature verification: there's no
 # Nushell equivalent to trust for that.
 #
+# Incremental: versions already in the existing file are carried over as-is,
+# never re-fetched or re-verified - only releases that aren't in it yet are
+# looked up, so a refresh (e.g. the nightly workflow's) is cheap when nothing
+# new has shipped.
+#
 #   cd terraform && bazel run //scripts:mirror_terraform_versions
 
 const HASHICORP_RELEASES_BASE_URL = "https://releases.hashicorp.com"
@@ -87,6 +92,21 @@ def parse-platform-shas []: string -> record {
     | reduce --fold {} {|row, acc| $acc | upsert $row.platform $row.sha256 }
 }
 
+# The versions already mirrored in `versions_file` (its `TERRAFORM_VERSIONS = {...}`), if
+# it exists - only versions that aren't in it yet are looked up. (Nushell's
+# `from json` accepts the trailing commas buildifier, which formats the
+# committed file, adds.)
+def load-existing [versions_file: string]: nothing -> record {
+    if not ($versions_file | path exists) {
+        return {}
+    }
+    let found = (open --raw $versions_file | parse --regex '(?s)TERRAFORM_VERSIONS\s*=\s*(?<json>\{.*\})\s*$')
+    if ($found | is-empty) {
+        error make {msg: $"Could not find TERRAFORM_VERSIONS = {...} in existing ($versions_file)"}
+    }
+    $found.0.json | from json
+}
+
 def main [] {
     let workspace = ($env.BUILD_WORKSPACE_DIRECTORY? | default "")
     if $workspace == "" {
@@ -97,14 +117,19 @@ def main [] {
     let gnupg_home = (mktemp --directory)
     let key_id = (import-hashicorp-key $gnupg_home)
 
-    let terraform_versions = (list-terraform-versions)
-    print --stderr $"Found ($terraform_versions | length) Terraform 1.x releases"
+    let existing = (load-existing $versions_file)
+    print --stderr $"($existing | columns | length) versions already mirrored"
 
-    let result = ($terraform_versions | reduce --fold {} {|version, acc|
+    let terraform_versions = (list-terraform-versions | where {|v| $v not-in ($existing | columns) })
+    print --stderr $"Found ($terraform_versions | length) Terraform 1.x release\(s\) not mirrored yet"
+
+    let new_entries = ($terraform_versions | reduce --fold {} {|version, acc|
         print --stderr $"Processing Terraform ($version)..."
         let sums = (fetch-verified-sums $version $key_id $gnupg_home)
         if $sums == null { $acc } else { $acc | insert $version ($sums | parse-platform-shas) }
     })
+    # Newest first, as the release listings are, ahead of what was already there.
+    let result = ($new_entries | merge $existing)
     rm --recursive --force $gnupg_home
 
     let header = [

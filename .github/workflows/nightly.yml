@@ -1,0 +1,130 @@
+name: Nightly
+
+# Refreshes every module's checksum mirrors (the generated `*versions.bzl`
+# files - see each module's `scripts/mirror_*` targets and its README's
+# Checksum mirror section), so newly released tool versions work without an
+# explicit `sha256`.
+#
+# Each module with changes gets its own pull request, `chore(<module>):
+# update version mirrors`, on a `nightly/<module>-version-mirrors` branch -
+# including the patch version bump and registry/ entry that title implies
+# (see .github/scripts/registry.nu), so it's released as soon as it merges.
+# The next night's run updates that same pull request (or closes it, if the
+# changes have landed some other way), rather than opening another one.
+#
+# Pull requests opened with the default GITHUB_TOKEN don't trigger other
+# workflows, so CI (ci.yml, registry.yml) wouldn't run on them. To have it
+# run, create a GitHub App with Contents and Pull requests read/write access,
+# install it on this repository, and set its ID as the NIGHTLY_APP_ID
+# repository variable and its private key as the NIGHTLY_APP_PRIVATE_KEY
+# repository secret - this then opens the pull requests as that App instead.
+# Without it, this still works (as long as "Allow GitHub Actions to create
+# and approve pull requests" is enabled in the repository's Actions
+# settings), but CI only runs once someone else pushes to the pull request.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [terraform, plantuml, k8s, opa, hugo, nushell]
+    runs-on: ubuntu-latest
+    # The mirrors only look up releases published since the last refresh, so
+    # this is normally quick - but one that has to verify a lot of new
+    # releases at once (e.g. a first run) can take a while.
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so registry.nu can find where the change diverged
+          # from main.
+          fetch-depth: 0
+
+      # Running Bazel would otherwise refresh any out-of-date MODULE.bazel.lock
+      # it touches, and the pull request below would pick that up too.
+      - name: Leave MODULE.bazel.lock files alone
+        run: echo "common --lockfile_mode=off" >>"$HOME/.bazelrc"
+
+      # The kubectl mirror verifies new releases' sigstore signatures.
+      - uses: sigstore/cosign-installer@v3
+        if: matrix.module == 'k8s'
+
+      - name: Run ${{ matrix.module }}'s mirror scripts
+        working-directory: ${{ matrix.module }}
+        env:
+          # Read-only use of the GitHub API (listing releases) - without it,
+          # requests are rate limited to 60 an hour, shared by every job on
+          # the runner's IP.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for target in $(bazel query --noshow_progress 'attr(name, "^mirror_", //scripts:all)'); do
+            echo "::group::${target}"
+            bazel run --noshow_progress "$target"
+            echo "::endgroup::"
+          done
+
+      # The mirror scripts write plain JSON, but the committed files are
+      # buildifier-formatted - format them the same way, so only an actual
+      # change to the mirrored versions counts as one.
+      - name: Format ${{ matrix.module }}'s mirrors
+        env:
+          BUILDIFIER_VERSION: v10.1.0
+          BUILDIFIER_SHA256: 31b6a8aa1e5c746696788f428729701770ad91925873d8256cb885c60e12c77e
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/buildifier" \
+            "https://github.com/bazel-contrib/buildtools/releases/download/${BUILDIFIER_VERSION}/buildifier-linux-amd64"
+          echo "${BUILDIFIER_SHA256}  ${RUNNER_TEMP}/buildifier" | sha256sum --check --quiet
+          chmod +x "$RUNNER_TEMP/buildifier"
+          git ls-files -z -- "${{ matrix.module }}/*versions.bzl" | xargs -0 --no-run-if-empty "$RUNNER_TEMP/buildifier"
+
+      - name: Bump ${{ matrix.module }}'s version and registry entry, if its mirrors changed
+        id: bump
+        env:
+          TITLE: "chore(${{ matrix.module }}): update version mirrors"
+        run: |
+          set -euo pipefail
+          git add -- "${{ matrix.module }}"
+          if git diff --cached --quiet -- "${{ matrix.module }}"; then
+            echo "${{ matrix.module }}: mirrors are up to date"
+          else
+            git diff --cached --stat -- "${{ matrix.module }}"
+            (cd .github && bazel run --noshow_progress //scripts:registry -- bump --title "$TITLE" --base origin/main)
+          fi
+          echo "title=${TITLE}" >>"$GITHUB_OUTPUT"
+
+      - name: Get a GitHub App token, if one's configured
+        id: app-token
+        if: vars.NIGHTLY_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.NIGHTLY_APP_ID }}
+          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
+
+      # Opens (or updates) the pull request with whatever's changed - or, if
+      # nothing has, deletes the branch, closing any pull request from a
+      # previous night that's no longer needed.
+      - name: Open or update ${{ matrix.module }}'s pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          branch: nightly/${{ matrix.module }}-version-mirrors
+          delete-branch: true
+          base: main
+          title: ${{ steps.bump.outputs.title }}
+          commit-message: ${{ steps.bump.outputs.title }}
+          body: |
+            Newly published `${{ matrix.module }}` tool versions, from its
+            checksum mirror scripts (`bazel run //scripts:mirror_*`), with the
+            patch version bump and `registry/` entry this title implies.
+
+            Opened by the [Nightly workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) - the next run updates this pull request.
+          labels: dependencies

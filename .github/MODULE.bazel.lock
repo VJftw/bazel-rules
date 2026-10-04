@@ -248,7 +248,7 @@
     "@@rules_nushell+//:extensions.bzl%nushell": {
       "general": {
         "bzlTransitiveDigest": "KEs6ytGzA37PP2KC3k8Bl+w+msRikEo2wHu80J1JidY=",
-        "usagesDigest": "1z2+rY3acfetWwPHcVssKJDAL5Hax0HqoMP8sVaeNwk=",
+        "usagesDigest": "5A6tdFhpOziM4mBDZckETabfpp7Mru1vHbul+euRmME=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "nushell": {

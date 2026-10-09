@@ -1,0 +1,22 @@
+module(
+    name = "rules_k8s",
+    version = "0.1.2",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# A real (non-dev) dependency: helm_template (and kustomize_build's staging
+# path) run their build actions via a hermetic nu (from rules_nushell's
+# toolchain) instead of a shell - see private/capture_stdout.nu and
+# private/stage_files.nu. rules_nushell requests its own default Nushell
+# version and registers its toolchains itself, so nothing more is needed
+# here (or from consumers).
+bazel_dep(name = "rules_nushell", version = "0.1.0")
+
+# rules_nushell lives alongside this module in the bazel-rules monorepo and
+# isn't released yet - only takes effect when this module is the root one
+# (e.g. developing it, or its mirror scripts), and is ignored otherwise.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
+)

@@ -9,6 +9,16 @@ given platform - an explicit `sha256` on the tag always overrides this.
 """
 
 KUSTOMIZE_VERSIONS = {
+    "5.8.3": {
+        "darwin_amd64": "d08fb85846c3d977f0e2a66e7ff45f1b5264c294685e5e726e1a8bdfe0da8dee",
+        "darwin_arm64": "4cbb08e209d8fff47cd60bfb6407daaf5ee699f9b9295849a1065024fac2d1ef",
+        "linux_amd64": "cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61",
+        "linux_arm64": "9867b76482cfc6d25b546abc1d2b5a32bd137505aba640649b4b378f64f6d68f",
+        "linux_ppc64le": "ff2f0b1f90cca3c14aae949d755c4796f4307d7cdb7bc6b7375044caf15814cb",
+        "linux_s390x": "b3f3bea8f941cae63d7fcd358dabc886498ba85ed628ff5a3b21da62e52d9db7",
+        "windows_amd64": "763c4040ff01435bfce39661072452ebdf1cf2808bb91f5708ab4420834fbd42",
+        "windows_arm64": "b86236917e649e2f9531899c519f333e554cd1fc0c87132b86b885bf315735dc",
+    },
     "5.8.2": {
         "darwin_amd64": "1ee90e851535f13b21b5fb69a24a6e843da13ca7aa52538e345ce7c15471ef47",
         "darwin_arm64": "4ce452c096a4005be16ddc02129255830d1d6605ffe3693699c72a1b2be48658",

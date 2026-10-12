@@ -8,6 +8,14 @@ for a given platform - an explicit `sha256` on the tag always overrides this.
 """
 
 NUSHELL_VERSIONS = {
+    "0.116.1": {
+        "linux_amd64": "13ef75df08df30f8d7b031df538e82a52c6e74ce839b1a9091c3a3f1969c3742",
+        "linux_arm64": "b103770c00bf322c409caa007aad44882d1cc5d24d82f719f877812ac33d6ad1",
+        "darwin_amd64": "44306f0766f2be0e763d0c7a6a6774537589a335797a199d8e5b473d766ec6bd",
+        "darwin_arm64": "302fb3dfc5d44e7fe0d5b8227be8e75b4c3956ca8d4804234e5c68fbdd3e4917",
+        "windows_amd64": "6658c9e61fe42c88326c1caa99e8dc9ad99bec6c0bc353e6ecb7c5d3f79feed7",
+        "windows_arm64": "e02a822226f4ea841cdfece707bac2a8b5888b3cfb6d4065a502e01ea5237092",
+    },
     "0.116.0": {
         "linux_amd64": "7b91aeef575080f4b90405ba4512f4ccd0c21a6fbcd99f18bde3272c75213f00",
         "linux_arm64": "bc3503d0588caa7c2835d61337825152141c748c126817739cb86519c593416e",

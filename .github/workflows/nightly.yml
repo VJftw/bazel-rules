@@ -5,12 +5,14 @@ name: Nightly
 # Checksum mirror section), so newly released tool versions work without an
 # explicit `sha256`.
 #
-# Each module with changes gets its own pull request, `chore(<module>):
-# update version mirrors`, on a `nightly/<module>-version-mirrors` branch -
-# including the patch version bump and registry/ entry that title implies
-# (see .github/scripts/registry.nu), so it's released as soon as it merges.
-# The next night's run updates that same pull request (or closes it, if the
-# changes have landed some other way), rather than opening another one.
+# Every module's mirrors are refreshed in parallel (one `update` job each),
+# then all of their changes go into a single pull request, `chore: update
+# version mirrors`, on the `nightly/version-mirrors` branch - including the
+# patch version bump and registry/ entry that title implies for each changed
+# module (see .github/scripts/registry.nu), so they're released as soon as it
+# merges. The next night's run updates that same pull request (or closes it,
+# if the changes have landed some other way), rather than opening another
+# one.
 #
 # Pull requests opened with the default GITHUB_TOKEN don't trigger other
 # workflows, so CI (ci.yml, registry.yml) wouldn't run on them. To have it
@@ -38,14 +40,9 @@ jobs:
     # releases at once (e.g. a first run) can take a while.
     timeout-minutes: 60
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Full history, so registry.nu can find where the change diverged
-          # from main.
-          fetch-depth: 0
 
       # Running Bazel would otherwise refresh any out-of-date MODULE.bazel.lock
       # it touches, and the pull request below would pick that up too.
@@ -86,20 +83,81 @@ jobs:
           chmod +x "$RUNNER_TEMP/buildifier"
           git ls-files -z -- "${{ matrix.module }}/*versions.bzl" | xargs -0 --no-run-if-empty "$RUNNER_TEMP/buildifier"
 
-      - name: Bump ${{ matrix.module }}'s version and registry entry, if its mirrors changed
-        id: bump
+      # Handed to the pull-request job below as a patch - only if there's
+      # anything in it.
+      - name: Save ${{ matrix.module }}'s changes
+        id: diff
         env:
-          TITLE: "chore(${{ matrix.module }}): update version mirrors"
+          MODULE: ${{ matrix.module }}
         run: |
           set -euo pipefail
-          git add -- "${{ matrix.module }}"
-          if git diff --cached --quiet -- "${{ matrix.module }}"; then
-            echo "${{ matrix.module }}: mirrors are up to date"
+          git add -- "$MODULE"
+          if git diff --cached --quiet -- "$MODULE"; then
+            echo "${MODULE}: mirrors are up to date"
           else
-            git diff --cached --stat -- "${{ matrix.module }}"
+            git diff --cached --stat -- "$MODULE"
+            git diff --cached --binary -- "$MODULE" >"$RUNNER_TEMP/${MODULE}.patch"
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: mirrors-${{ matrix.module }}
+          path: ${{ runner.temp }}/${{ matrix.module }}.patch
+          retention-days: 1
+
+  pull-request:
+    needs: update
+    # Still opens a pull request with every other module's changes if one
+    # module's mirrors failed - that one's are picked up again the next night.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so registry.nu can find where the change diverged
+          # from main.
+          fetch-depth: 0
+
+      # As above - registry.nu runs with Bazel too.
+      - name: Leave MODULE.bazel.lock files alone
+        run: echo "common --lockfile_mode=off" >>"$HOME/.bazelrc"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mirrors-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/patches
+
+      - name: Bump every changed module's version and registry entry
+        id: bump
+        env:
+          TITLE: "chore: update version mirrors"
+          PATCHES: ${{ runner.temp }}/patches
+        run: |
+          set -euo pipefail
+          for patch in "$PATCHES"/*.patch; do
+            [ -e "$patch" ] || continue
+            git apply --index "$patch"
+          done
+          modules=""
+          if git diff --cached --quiet; then
+            echo "All mirrors are up to date"
+          else
+            git diff --cached --stat
+            modules=$(git diff --cached --name-only | cut -d/ -f1 | sort -u | sed 's/.*/- `&`/')
             (cd .github && bazel run --noshow_progress //scripts:registry -- bump --title "$TITLE" --base origin/main)
           fi
           echo "title=${TITLE}" >>"$GITHUB_OUTPUT"
+          {
+            echo "modules<<EOF"
+            echo "$modules"
+            echo "EOF"
+          } >>"$GITHUB_OUTPUT"
 
       - name: Get a GitHub App token, if one's configured
         id: app-token
@@ -112,19 +170,23 @@ jobs:
       # Opens (or updates) the pull request with whatever's changed - or, if
       # nothing has, deletes the branch, closing any pull request from a
       # previous night that's no longer needed.
-      - name: Open or update ${{ matrix.module }}'s pull request
+      - name: Open or update the pull request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ steps.app-token.outputs.token || github.token }}
-          branch: nightly/${{ matrix.module }}-version-mirrors
+          branch: nightly/version-mirrors
           delete-branch: true
           base: main
           title: ${{ steps.bump.outputs.title }}
           commit-message: ${{ steps.bump.outputs.title }}
           body: |
-            Newly published `${{ matrix.module }}` tool versions, from its
-            checksum mirror scripts (`bazel run //scripts:mirror_*`), with the
-            patch version bump and `registry/` entry this title implies.
+            Newly published tool versions, from the checksum mirror scripts
+            (`bazel run //scripts:mirror_*`), for:
+
+            ${{ steps.bump.outputs.modules }}
+
+            with the patch version bump and `registry/` entry this title
+            implies for each.
 
             Opened by the [Nightly workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) - the next run updates this pull request.
           labels: dependencies

@@ -10,6 +10,19 @@ a given platform - an explicit `sha256` on the tag always overrides this.
 """
 
 HELM_VERSIONS = {
+    "3.22.1": {
+        "darwin_amd64": "cf850a81b908f8eef0331e6b18776da2767bcac639ca84472311dad20008495c",
+        "darwin_arm64": "e73da8a0b0d5193774fdff17ce6319c7436bb22ee229b45fd64f3c40368c753a",
+        "linux_386": "67b35ee3d31fa93b7ca5884e71beef3c3b5d9bab46ead792081ed2b6131d73c5",
+        "linux_amd64": "896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea",
+        "linux_arm": "a1563d16cf9537db798116d5647ad0ef8cf963fa7cbbe24d8db534250273cccc",
+        "linux_arm64": "4c29e286b279d170fa048ddfc3e4e83dcd069ca9c52102766ba672d7149e694d",
+        "linux_ppc64le": "48a9711b69f0b63504f710ba18766dd5f5424fe380e67304aa3c89e1c0b97b5c",
+        "linux_riscv64": "960ca50df1eb70a50a8cb90fc67573cf047239fc0b72f63514a534e4f2e2ef32",
+        "linux_s390x": "ef039296b433a0a6965fdf55f4ee0ad50e3d94bb70a77e4896309406c9bc8fab",
+        "windows_amd64": "32ce9f4509b81782c9740898c43946e1f97c4d93ec5d10222c9b6eeec21ea043",
+        "windows_arm64": "10104b049309d4c751bca88254843e16edd84141411f63503f10845ea33cbd2f",
+    },
     "3.22.0": {
         "darwin_amd64": "bd1d09f316558dda23698527859600936fed1371021ce0f2272d66b2fdcfa69c",
         "darwin_arm64": "4c9982a6cdeb458b60258df66b55398ca5b19293f6877faffe2909ad6f23dfe0",

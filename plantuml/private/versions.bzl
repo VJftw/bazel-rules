@@ -9,6 +9,7 @@ explicit `sha256` on the tag always overrides this.
 """
 
 PLANTUML_VERSIONS = {
+    "1.2026.9": "96ace11f947a04a4320a413a0a2c6bad8b87daaac1869fe51e82622d812fe13c",
     "1.2017.12": "2f713264cd89f4cb3e04da2947fd29f546f5f50370357f74d28002213fc18260",
     "1.2017.13": "2cd6d034ff00838f370e0e31fd30ef5f929fbbd54051f6e9d44cdec943cb80f6",
     "1.2017.14": "c02905a7b05cf9e5dd51a2208d8d83bd711d9edb2ebc70260f8436a2ab7537b9",

@@ -10,6 +10,24 @@ this.
 """
 
 TERRAFORM_VERSIONS = {
+    "1.17.0": {
+        "darwin_amd64": "3773397524196e4ebbf7167e2b9fb478dff1962d555d649f616ba97ca446a143",
+        "darwin_arm64": "7472a54cca911d46c0e399a5ebbce44444912d0d4dad7495f37f1fa51e7ca6b7",
+        "freebsd_386": "4e67714d16e72a5a8d4eda22ce5edd9f505df615cc916be457106c5eee2bbe3d",
+        "freebsd_amd64": "a300e0f23267d6436e2755833b374b1a1a515806bf48218341da39e661bb0d0b",
+        "freebsd_arm": "b51e6fdd4e842f5174e248ed05d9db08251274ef142f14689f311e8ee89734b5",
+        "linux_386": "1a00f265b74d27696ac8d3e76e17f4be330b9a052d5014db3a1184044ce223d1",
+        "linux_amd64": "c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67",
+        "linux_arm": "6afa19b6b59648160fb011f29994960efca87cba7cac3e5a86ca8df7be13019d",
+        "linux_arm64": "f32478134ffc6d710eec474bbd316652cdddc0f4e336973a3745e8d3a3309cdf",
+        "linux_s390x": "390c7741a01add4dd0c6b6cbae532609da1ce815ab108c8fda2861825eaf55b9",
+        "openbsd_386": "7eab8826883d1b67804f0065ff447809c12e95efabb26650bf484c3207142f9d",
+        "openbsd_amd64": "d0cd6b0dde8560befab5f78f9b12e5072a880fe967b82b604aa2c9362b830792",
+        "solaris_amd64": "f684b17b5d1e506ff991139e13979eaced00c06523c20c4cc54ea1cce4a5bb12",
+        "windows_386": "43c391240888f63c7cd8f170fe1d78068a1929e8d94d083f065741035a84a30f",
+        "windows_amd64": "2948dd7f77dec0f562ec29000103e0441d915be5e5f1a02c1ce23681951cfb19",
+        "windows_arm64": "a046cd5ae9ded5f18a84fdc255cb1d47822b48fb06c5afc6f8f1740c6965fb06",
+    },
     "1.16.6": {
         "darwin_amd64": "794a36c3f7ebf6c58f2089c226068a539d1705ba358a5679b51671c8dc7ebc7b",
         "darwin_arm64": "85e1bc78ab45bdc5f82a7bac3929e37d072834a584d22583a2498dc67bb624cd",

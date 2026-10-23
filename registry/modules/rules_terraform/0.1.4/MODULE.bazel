@@ -1,0 +1,33 @@
+module(
+    name = "rules_terraform",
+    version = "0.1.4",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+
+# A real (non-dev) dependency: every rule here runs its build actions (and
+# the terraform_root runner) via a hermetic nu (from rules_nushell's
+# toolchain) instead of bash - see private/*.nu. rules_nushell requests its
+# own default Nushell version and registers its toolchains itself, so
+# nothing more is needed here (or from consumers).
+bazel_dep(name = "rules_nushell", version = "0.1.0")
+
+# rules_nushell lives alongside this module in the bazel-rules monorepo and
+# isn't released yet - only takes effect when this module is the root one
+# (e.g. developing it, or its mirror script), and is ignored otherwise.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
+)
+
+# Self-use of this module's own `terraform` extension - not for versions/
+# providers/modules (this module declares none of its own), but so
+# `private/root.bzl`'s `Label("@terraform//:default_script")` (a `.bzl`
+# file's own `Label()` calls always resolve via the *defining* module's repo
+# mapping, never a consumer's) has an apparent "@terraform" to resolve at
+# all. Since the extension isn't isolated, this doesn't create a second hub -
+# every module (including consumers) that `use_repo`s "terraform" shares the
+# exact same one.
+terraform = use_extension("//:extensions.bzl", "terraform")
+use_repo(terraform, "terraform")

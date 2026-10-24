@@ -8,6 +8,13 @@ a given platform - an explicit `sha256` on the tag always overrides this.
 """
 
 OPA_VERSIONS = {
+    "1.21.4": {
+        "linux_amd64": "2ab571f367f293bb19523b76f92f1945bbf245003392c7f392903f95c2b9b630",
+        "linux_arm64": "810aa96e44f1f852d044888cf830324e44eafd0f510345339011347ab4deaab1",
+        "darwin_amd64": "8802bd39bc14b58a705e6b3d4f4dd14f7f24ee657f0362c737338be243190c7e",
+        "darwin_arm64": "4c105208a9282f590385bccbe600875c011f0894ccf9431782dfe855e1f99aa6",
+        "windows_amd64": "efad1c0ee4e3150d213f7babdaff3440b18b93c7368b465fca42cda392947f7c",
+    },
     "1.21.3": {
         "linux_amd64": "add7c9dcf56e1ce1538426a6ee595ea1cc7ee830bbedd4c23219825b02b19a79",
         "linux_arm64": "45c8734a41436bf21d82453c2aa7b0ad47c150e8237310b8665e8b5a01305fc0",

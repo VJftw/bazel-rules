@@ -9,6 +9,12 @@ explicit `sha256` on the tag always overrides this.
 """
 
 HUGO_VERSIONS = {
+    "0.169.0": {
+        "windows_amd64": "396b4c8326dc2dd61c2618f825042781c5ea43e1ac1375a2204a9fde4e98b84c",
+        "linux_arm64": "5b190e5d2836c09efe25cc6249f70bde8a6c5331ef412a4c9137e9d5de89a515",
+        "linux_amd64": "c41672a0725d307758a132bc94a962e59760eb33f9ba08c991b81f9881d6fa7d",
+        "darwin_universal": "d48dfd5adab308f941e83e48c5ba925747cf383395972278942cf526ad27cf38",
+    },
     "0.168.0": {
         "darwin_universal": "6e8c6a1e6db996bb9e71c8728461f372c78f12eb18135b709837227debf84940",
         "linux_amd64": "787f100057328824f38c6ad7c87ff10d6451ae0a7bc39cedaad0dd2bcde17e53",

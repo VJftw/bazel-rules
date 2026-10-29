@@ -13,6 +13,34 @@ entirely, never falls back to unverified.
 """
 
 KUBECTL_VERSIONS = {
+    "1.37.2": {
+        "darwin_amd64": "88379aff5c8111de6be0a394adffba2819e44cde269f3ab23cef76de1a48eaa8",
+        "darwin_arm64": "55701af0d51815ee335f240e48acf0959c3c23017ed3fa816e880c4a92bae581",
+        "linux_amd64": "c04487523e7aa7d1493f7808174c899db93d7a9cf57531420cd76b9bd415f8f4",
+        "linux_arm64": "fcc16f63186659d9722014b7e02d5fdd2d4e669cb8c0ab66365d7d3b8ba03509",
+        "windows_amd64": "1691938f7de0e931969f9968c3601cf32d6b0d573573afb4ce471f3d28f51984",
+    },
+    "1.36.6": {
+        "darwin_amd64": "2e22d382f2423c88d9d076246f860bb3d5c743dd279ca63e113474bb88382426",
+        "darwin_arm64": "1cf735c3d35ccfec28d0618784cb06a4614d2c42aade28b6be0eab76a2ffb623",
+        "linux_amd64": "29818b6729dc9262b692307470d0558d027725e738be5dd47c760261868a2634",
+        "linux_arm64": "35507ef408c3d38849e5d3203e18f8e861db822aa664101a9ced0869edd06046",
+        "windows_amd64": "2bc0fbea066016c62cfef307108c303c2f796420d4a5dfc844de6e25d4bc47e0",
+    },
+    "1.35.10": {
+        "darwin_amd64": "4787e20d9029871845d8a57bf56f533870f5d98d9cf3b82b6f5e2ad5eaeee3a3",
+        "darwin_arm64": "77ec066f3404edb81760865c9cd812d03c25e9a89aa0349fd3c1aa60bd5fb068",
+        "linux_amd64": "c49a28f1f4efc4d475ed05f47f2ce8e563bf7bef69ed77fe1b924ea6d83b6327",
+        "linux_arm64": "283f1be6a46b3695b625e25030106b8ffe18bd0d3a900f5b65c259ca407f04f5",
+        "windows_amd64": "c546d84d0b5b6c8a796ce328b9493f7a9260a67f775fe16425aa7b1ab10531b4",
+    },
+    "1.34.13": {
+        "darwin_amd64": "7655b001c24adffac62f7905bde27ccdd2f59cc32bb947f72a8f6e984ca69cb1",
+        "darwin_arm64": "c246beefae38db97fd82977864fe9253cd14a3f66325827e56082747bd72143d",
+        "linux_amd64": "b4bb494e9466a7a94bb851414548bc0d3e2f8da90757e6eccc3371e648648591",
+        "linux_arm64": "66e8283d52d9bc1f9c0e9daade7c971cd20db5a379306862897dfb25395f3e03",
+        "windows_amd64": "b92ac6e0ad545f224a043545e128922106b2ceb8265185b187978f62763bc525",
+    },
     "1.36.5": {
         "darwin_amd64": "03338828c3ba74c37bf5964573fbfbab132eb5bb15da2f821c25a4043d6eb3f0",
         "darwin_arm64": "c5850a4a6b9469b26cce47c1ab456285f58e308283dcdf72b4ddda3db49b0ec0",

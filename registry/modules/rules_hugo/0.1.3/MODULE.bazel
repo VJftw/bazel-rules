@@ -1,0 +1,21 @@
+module(
+    name = "rules_hugo",
+    version = "0.1.3",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# A real (non-dev) dependency: hugo_build's build action runs via a hermetic
+# nu (from rules_nushell's toolchain) instead of a shell - see
+# private/run_hugo.nu. rules_nushell requests its own default Nushell version
+# and registers its toolchains itself, so nothing more is needed here (or
+# from consumers).
+bazel_dep(name = "rules_nushell", version = "0.1.0")
+
+# rules_nushell lives alongside this module in the bazel-rules monorepo and
+# isn't released yet - only takes effect when this module is the root one
+# (e.g. developing it, or its mirror script), and is ignored otherwise.
+local_path_override(
+    module_name = "rules_nushell",
+    path = "../nushell",
+)

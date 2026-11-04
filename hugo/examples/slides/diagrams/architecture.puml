@@ -1,0 +1,15 @@
+@startuml
+skinparam componentStyle rectangle
+
+actor Author
+component "PlantUML" as plantuml
+component "Hugo" as hugo
+component "reveal.js" as reveal
+node "Static site" as site
+
+Author --> plantuml : .puml
+Author --> hugo : .md
+plantuml --> hugo : .svg
+reveal --> hugo : JS/CSS
+hugo --> site
+@enduml

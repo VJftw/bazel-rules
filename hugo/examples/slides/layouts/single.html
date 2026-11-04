@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ .Title }}</title>
+  <link rel="stylesheet" href="{{ "reveal/reset.css" | relURL }}">
+  <link rel="stylesheet" href="{{ "reveal/reveal.css" | relURL }}">
+  {{/* A deck can pick any of reveal.js's themes with `theme = "..."`. */}}
+  <link rel="stylesheet" href="{{ printf "reveal/theme/%s.css" (.Params.theme | default "white") | relURL }}">
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      {{/* Each `---` in the page's Markdown (a <hr>) starts a new slide. */}}
+      {{ range split .Content "<hr>" }}
+      <section>{{ . | safeHTML }}</section>
+      {{ end }}
+    </div>
+  </div>
+  <script src="{{ "reveal/reveal.js" | relURL }}"></script>
+  <script src="{{ "reveal/plugin/notes.js" | relURL }}"></script>
+  <script>
+    Reveal.initialize({ hash: true, plugins: [RevealNotes] });
+  </script>
+</body>
+</html>

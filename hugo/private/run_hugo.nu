@@ -25,9 +25,22 @@ def --wrapped main [
 ] {
     for pair in (open $manifest) {
         let dest = ($scratch | path join $pair.1)
-        mkdir ($dest | path dirname)
-        # Follows symlinks - the whole point, see above.
-        cp --preserve [] $pair.0 $dest
+        if ($pair.0 | path type) == "dir" {
+            # A directory (another rule's tree artifact, e.g. a downloaded
+            # library) - its whole contents, at the same path. File by file,
+            # since a recursive `cp` would keep any symlinks inside it.
+            let src = ($pair.0 | path expand --no-symlink)
+            mkdir $dest
+            for file in (glob --no-dir --follow-symlinks ($src | path join "**" "*")) {
+                let target = ($dest | path join ($file | path relative-to $src))
+                mkdir ($target | path dirname)
+                cp --preserve [] $file $target
+            }
+        } else {
+            mkdir ($dest | path dirname)
+            # Follows symlinks - the whole point, see above.
+            cp --preserve [] $pair.0 $dest
+        }
     }
 
     let config_dir = ($config_dest | path dirname)

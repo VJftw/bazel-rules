@@ -28,7 +28,12 @@ def hugo_site(
             hugo.json, or the legacy config.toml/config.yaml/config.json
             name) - its own directory becomes the site's `--source` root.
         srcs: every other file the site needs - content/, layouts/,
-            static/, assets/, data/, i18n/, archetypes/, etc.
+            static/, assets/, data/, i18n/, archetypes/, etc. Each is placed
+            at its path relative to its package's repository root, so
+            another rule's output (e.g. a rendered diagram, or a directory -
+            a tree artifact - such as a downloaded library) goes wherever
+            that rule's package and output name put it, a directory's whole
+            contents included.
         base_url: passed via `--baseURL`.
         environment: passed via `--environment` (selects environment-
             specific config overlays, e.g. `config/production/...`) -

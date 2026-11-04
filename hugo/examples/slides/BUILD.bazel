@@ -1,0 +1,35 @@
+load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@rules_hugo//:defs.bzl", "hugo_site")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+# reveal.js's dist/ directory (see MODULE.bazel), at static/reveal/ in this
+# site - a directory (tree artifact), so it's served at /reveal/.
+copy_to_directory(
+    name = "revealjs",
+    srcs = ["@revealjs//:dist"],
+    out = "static/reveal",
+    include_external_repositories = ["*revealjs"],
+    root_paths = ["dist"],
+)
+
+# `cd slides && bazel run //slides:public_hugo -- server` for a local preview
+# (after `bazel build //slides:all`, for the diagrams and reveal.js).
+hugo_site(
+    name = "public",
+    srcs = glob([
+        "content/**",
+        "layouts/**",
+    ]) + [
+        ":revealjs",
+        "//slides/diagrams",
+    ],
+    config = "hugo.toml",
+)
+
+# Checks the deck has its three slides, with both diagrams and reveal.js.
+sh_test(
+    name = "public_test",
+    srcs = ["public_test.sh"],
+    args = ["$(rootpath :public)"],
+    data = [":public"],
+)

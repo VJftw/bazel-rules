@@ -1,0 +1,15 @@
+baseURL = "https://example.org/"
+title = "Slides"
+# Just the home page (listing every deck) and the decks themselves.
+disableKinds = ["section", "taxonomy", "term", "rss", "sitemap"]
+
+# The rendered PlantUML diagrams are built into diagrams/ (see its BUILD file),
+# and served at /diagrams/ alongside everything in static/. Any mount for a
+# target replaces Hugo's default one, so static/ is listed too.
+[[module.mounts]]
+source = "static"
+target = "static"
+
+[[module.mounts]]
+source = "diagrams"
+target = "static/diagrams"

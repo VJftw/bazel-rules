@@ -49,6 +49,7 @@ See [Usage](#usage) below for the full BCR/`git_override`/local dev options.
 
 - [Rules](#rules)
 - [Usage](#usage)
+- [Generated files and directories](#generated-files-and-directories)
 - [How it works](#how-it-works)
 - [Staging and symlinks](#staging-and-symlinks)
 - [The `--destination` quirk](#the---destination-quirk)
@@ -144,6 +145,42 @@ hugo_site(
 `bazel build //:public` produces a `public/` directory of the rendered site;
 `bazel run //:public_hugo -- server` runs a live-reloading local preview
 using the same pinned `hugo` version.
+
+## Generated files and directories
+
+`srcs` can include other rules' outputs, not just source files. Each one is
+placed at its path relative to its package's repository root, the same as a
+source file. A directory output (a tree artifact) is copied with everything
+in it. For example, a rendered diagram goes wherever its rule writes it, and
+a downloaded library can be placed under `static/` with
+[bazel_lib](https://github.com/bazel-contrib/bazel-lib)'s `copy_to_directory`:
+
+```starlark
+# reveal.js's dist/ directory, from an http_archive, at static/reveal/.
+copy_to_directory(
+    name = "revealjs",
+    srcs = ["@revealjs//:dist"],
+    out = "static/reveal",
+    include_external_repositories = ["*revealjs"],
+    root_paths = ["dist"],
+)
+
+hugo_site(
+    name = "public",
+    config = "hugo.toml",
+    srcs = glob(["content/**", "layouts/**"]) + [
+        ":revealjs",
+        "//slides/diagrams",  # plantuml_diagram outputs
+    ],
+)
+```
+
+An output that isn't already in one of Hugo's own directories can be served
+from anywhere with a [module mount](https://gohugo.io/configuration/module/#mounts)
+in `hugo.toml`.
+`examples/slides/` is a complete example: reveal.js slide decks written in
+Markdown (each `---` starts a new slide), with
+[rules_plantuml](../plantuml) diagrams.
 
 ## How it works
 
@@ -289,3 +326,8 @@ own header comment for more.
   version, in the [VJftw/bazel-rules](https://github.com/VJftw/bazel-rules)
   monorepo this module lives in. Build it by `cd`ing in first: `cd examples
   && bazel build //site:public`.
+  `slides/` is a site of reveal.js slide decks (see Generated files and
+  directories above): reveal.js comes from its npm package via
+  `http_archive` + `copy_to_directory`, `slides/diagrams/` renders its
+  PlantUML diagrams with `rules_plantuml`, and `slides:public_test` checks the
+  result.

@@ -95,7 +95,7 @@ hugo_build = rule(
         "srcs": attr.label_list(
             mandatory = True,
             allow_files = True,
-            doc = "Every other file the site needs - content/, layouts/, static/, assets/, data/, i18n/, archetypes/, etc.",
+            doc = "Every other file the site needs - content/, layouts/, static/, assets/, data/, i18n/, archetypes/, etc. Each is placed at its path relative to its package's repository root, so another rule's output (e.g. a rendered diagram, or a directory - a tree artifact - such as a downloaded library) goes wherever that rule's package and output name put it, a directory's whole contents included.",
         ),
         "base_url": attr.string(
             doc = "Passed via `--baseURL`.",

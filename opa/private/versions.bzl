@@ -8,6 +8,20 @@ a given platform - an explicit `sha256` on the tag always overrides this.
 """
 
 OPA_VERSIONS = {
+    "1.22.2": {
+        "linux_amd64": "24e344d1fc394cd93dc75666f584cfb97c6981f7255af25f8d2979834317317b",
+        "linux_arm64": "8fc1c524f93b4369eb207961aba213d990604205fc49fe3ba923dfc125c8a422",
+        "darwin_amd64": "d0b8203cd6c4540c0e0664fee80b13ca4e89b37f1646d73efd6f6417ff635957",
+        "darwin_arm64": "c7767cb68c21c3ea9866a76a2d6703d132a25ddad3cd1c1213925e2802ed1dce",
+        "windows_amd64": "ef8bd2e56a329f91192053da7e4adfb09fbfdaee07de588d6c10b939d581bc64",
+    },
+    "1.22.1": {
+        "linux_amd64": "54906558f11bfcbc1b0818ab7ea97f4e066f6d8b91d1111bea244ac16bacd2f7",
+        "linux_arm64": "8fc13f526473798631c5565838727ffa47d31331a937abdfe4a2f19e981eadfa",
+        "darwin_amd64": "646087abd71d1e643dbdc4155fef540ea105c34fa76f0cbfc72daa5588d92597",
+        "darwin_arm64": "be5d4390dff20aa2bfabf104b3d7c51242fca8ecbd98a8278f11d799373dd962",
+        "windows_amd64": "b1f93524c7f116c8c566803a99297fa56eb389fd2440fb65e30802aa611e0612",
+    },
     "1.22.0": {
         "linux_amd64": "791790254c598a942eb140959bcec9a47f844535a632fd01d11d870ba2a47047",
         "linux_arm64": "62f64100c5db155a7499c14668a5a453feb7d94221736e12c7d759c0f46fc585",

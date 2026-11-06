@@ -1,0 +1,10 @@
+@startuml
+participant "plz / bazel" as build
+participant PlantUML
+participant Hugo
+
+build -> PlantUML : render diagrams
+PlantUML --> build : architecture.svg
+build -> Hugo : content + layouts + diagrams + reveal.js
+Hugo --> build : public/
+@enduml

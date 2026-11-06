@@ -1,0 +1,18 @@
+load("@rules_plantuml//:defs.bzl", "plantuml_diagram")
+
+# Every diagram, rendered into this package - hugo.toml mounts it at
+# /diagrams/ in the site.
+[
+    plantuml_diagram(
+        name = src.removesuffix(".puml"),
+        src = src,
+        format = "svg",
+    )
+    for src in glob(["*.puml"])
+]
+
+filegroup(
+    name = "diagrams",
+    srcs = [src.removesuffix(".puml") for src in glob(["*.puml"])],
+    visibility = ["//slides:__pkg__"],
+)

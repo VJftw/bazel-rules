@@ -1,6 +1,6 @@
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load("@rules_hugo//:defs.bzl", "hugo_site")
-load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@rules_nushell//:defs.bzl", "nu_test")
 
 # reveal.js's dist/ directory (see MODULE.bazel), at static/reveal/ in this
 # site - a directory (tree artifact), so it's served at /reveal/.
@@ -27,9 +27,8 @@ hugo_site(
 )
 
 # Checks the deck has its three slides, with both diagrams and reveal.js.
-sh_test(
+nu_test(
     name = "public_test",
-    srcs = ["public_test.sh"],
-    args = ["$(rootpath :public)"],
+    src = "public_test.nu",
     data = [":public"],
 )

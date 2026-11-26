@@ -13,6 +13,27 @@ entirely, never falls back to unverified.
 """
 
 KUBECTL_VERSIONS = {
+    "1.37.3": {
+        "darwin_amd64": "82db1bc2b466e9f46ed36d609d8c10523a425664e6e648a666df252b9502fe9e",
+        "darwin_arm64": "7ac1234e7731e902e5ab2153e2ed29bbe7abddd7b0be5ffd94afb7df47da8f27",
+        "linux_amd64": "9a1b55af2795b25dd288dbef62387db9b5530087ab918d28c6ad067f2e3cb07c",
+        "linux_arm64": "da160b41491cc5c5e575d78bb665810fb900f70fad666d834094b24ec56d304f",
+        "windows_amd64": "98ee2ce86421b2e2ff24b4d3c081883487694371b8ca2e40e125f413677a5337",
+    },
+    "1.36.7": {
+        "darwin_amd64": "ca582ece9c1156578698c903ea6c3da015da753b3206e1274cbaa2be86d1545b",
+        "darwin_arm64": "a6d4cd1d1b3806b152595637d3925f9cf349ce40e1809298829aba7670f6d4e9",
+        "linux_amd64": "b08f96b43904747897fe569b3c51056b00ddfc67847f6db1bf9fe0c9583a2d26",
+        "linux_arm64": "4e83edb4cc75beae9dc7cfb42be71899d5397a7b6a2384fbe1ae163d4f544aaf",
+        "windows_amd64": "68d9e76bca751214a5757a6903b24e490e448f6510fc8a47906b787c98823e0a",
+    },
+    "1.35.11": {
+        "darwin_amd64": "528798e1517180416df80b800ba520c3a33077d9fb7ce8999b75cebd4fc8fd01",
+        "darwin_arm64": "2eb5ac1342e3f5e18b95536e40691940995a9923e72c031b763ff3acbd7107b9",
+        "linux_amd64": "eeddea383a302f9a633a292af1d886054c7cf152fb407f827f12bfe286dc46d6",
+        "linux_arm64": "e69973a0b8c23412f2f6bba6a91b98579a1787c4d731fb4cb5987ba273763318",
+        "windows_amd64": "5716da856ab16cf7d14a3b3b05582d531e8a324c3f4a21f844fdeb8bfd80b77f",
+    },
     "1.37.2": {
         "darwin_amd64": "88379aff5c8111de6be0a394adffba2819e44cde269f3ab23cef76de1a48eaa8",
         "darwin_arm64": "55701af0d51815ee335f240e48acf0959c3c23017ed3fa816e880c4a92bae581",
